@@ -2,8 +2,6 @@
 
 This Terraform module helps you deploy a static website on GCP seamlessly.
 
-**Note:** Cloning this repository is not required to use the module.
-
 ## Prerequisites
 
 Before you begin, ensure the following:
@@ -12,34 +10,6 @@ Before you begin, ensure the following:
 2. You have access to a GCP account with a user having sufficient permissions.
 3. A registered domain. The registrar does not have to be GCP however, preferred.
 
-## Setup Instructions
-
-### 1. Install Terraform
-
-Follow the official [Terraform installation guide](https://developer.hashicorp.com/terraform/tutorials/aws-get-started/install-cli) to set up Terraform for your operating system.
-
-### 2. Create a Terraform Project
-
-1. Create and navigate to a new directory for your Terraform project:
-   ```bash
-   mkdir my-website-resources && cd my-website-resources
-   ```
-
-2. Create a `main.tf` file in the directory and copy the content from the `example/main.tf` file of this module.
-
-3. Customize the configuration in `main.tf` to fit your requirements, such as website repository details and parameters. Additionally, fill in the project id and the region you want to use to deploy your resources.
-
-4. Initialize Terraform in your project directory:
-   ```bash
-   terraform init
-   ```
-
-5. Apply the Terraform configuration to deploy your resources:
-   ```bash
-   terraform apply
-   ```
-
-Important note: Please note that in order to be able to modify your resources later, you must NOT remove or modify the Terraform state file automatically created in this directory. Otherwise, you will have to destroy the resources manually. (Cloud-based state file will come soon to this module.)
 
 ## Input Variables
 
@@ -112,11 +82,3 @@ The `dns_config` block controls DNS settings.  The `set_dns_config` variable det
 
 TLS certificate verification may take some time.
 
-
-
-## Destroy Instructions
-Simply move to the directory you created in the setup section and perform the Terraform destroy command:
-
-```bash
-cd my-website-resources && terraform destroy
-```
