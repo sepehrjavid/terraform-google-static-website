@@ -1,8 +1,10 @@
 variable "branches" {
-  type = set(string)
+  description = "Set of branch names that need deployment."
+  type        = set(string)
 }
 
 variable "github_config" {
+  description = "GitHub configuration details."
   type = object({
     access_token        = string
     app_installation_id = string
@@ -12,26 +14,31 @@ variable "github_config" {
 }
 
 variable "enable_cicd" {
-  type    = bool
-  default = true
+  description = "Enables CI/CD for automated deployments."
+  type        = bool
+  default     = true
 }
 
 variable "enable_cdn" {
-  type    = bool
-  default = true
+  description = "Enables Cloud CDN for better performance."
+  type        = bool
+  default     = true
 }
 
 variable "enable_http_redirect" {
-  type    = bool
-  default = true
+  description = "Enables HTTP to HTTPS redirection."
+  type        = bool
+  default     = true
 }
 
 variable "default_branch_name" {
-  type    = string
-  default = "main"
+  description = "The name of the default production branch."
+  type        = string
+  default     = "main"
 }
 
 variable "dns_config" {
+  description = "Configuration for DNS settings."
   type = object({
     set_dns_config = optional(bool, false)
     zone_name      = optional(string, null)
