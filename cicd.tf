@@ -12,7 +12,7 @@ resource "google_project_service" "project" {
 }
 
 resource "google_secret_manager_secret" "github_token_secret" {
-  count     = var.cicd.enable ? 1 : 0
+  count     = var.cicd.enable && !var.cicd.existing_gh_conn_name ? 1 : 0
   secret_id = "${var.name_prefix}-github_access_token"
 
   replication {
@@ -23,13 +23,13 @@ resource "google_secret_manager_secret" "github_token_secret" {
 }
 
 resource "google_secret_manager_secret_version" "github_token_secret_version" {
-  count       = var.cicd.enable ? 1 : 0
+  count       = var.cicd.enable && !var.cicd.existing_gh_conn_name ? 1 : 0
   secret      = google_secret_manager_secret.github_token_secret[0].id
   secret_data = var.cicd.github_config.access_token
 }
 
 data "google_iam_policy" "serviceagent_secretAccessor" {
-  count = var.cicd.enable ? 1 : 0
+  count = var.cicd.enable && !var.cicd.existing_gh_conn_name ? 1 : 0
 
   binding {
     role    = "roles/secretmanager.secretAccessor"
@@ -38,14 +38,14 @@ data "google_iam_policy" "serviceagent_secretAccessor" {
 }
 
 resource "google_secret_manager_secret_iam_policy" "policy" {
-  count       = var.cicd.enable ? 1 : 0
+  count       = var.cicd.enable && !var.cicd.existing_gh_conn_name ? 1 : 0
   project     = google_secret_manager_secret.github_token_secret[0].project
   secret_id   = google_secret_manager_secret.github_token_secret[0].secret_id
   policy_data = data.google_iam_policy.serviceagent_secretAccessor[0].policy_data
 }
 
 resource "google_cloudbuildv2_connection" "git_connection" {
-  count    = var.cicd.enable ? 1 : 0
+  count    = var.cicd.enable && !var.cicd.existing_gh_conn_name ? 1 : 0
   location = data.google_client_config.client_config.region
   name     = "${var.name_prefix}-gh-connection"
 

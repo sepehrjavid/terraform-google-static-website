@@ -6,7 +6,8 @@ variable "branches" {
 variable "cicd" {
   description = "CI/CD configuration"
   type = object({
-    enable = optional(bool, true)
+    enable                = optional(bool, true)
+    existing_gh_conn_name = optional(string, null)
     github_config = optional(object({
       access_token        = string
       app_installation_id = string
@@ -15,8 +16,8 @@ variable "cicd" {
   })
   sensitive = true
   validation {
-    condition     = !var.cicd.enable || github_config != null
-    error_message = "github_config is required when cicd.enable is set to true."
+    condition     = !var.cicd.enable || existing_gh_conn_name != null || github_config != null
+    error_message = "Either github_config or existing_gh_conn_name must be provided when cicd.enable is set to true."
   }
 }
 
