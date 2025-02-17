@@ -14,9 +14,9 @@ variable "cicd" {
       repo_uri            = string
     }), null)
   })
-  sensitive = true
+  # sensitive = true
   validation {
-    condition     = !var.cicd.enable || existing_gh_conn_name != null || github_config != null
+    condition     = !var.cicd.enable || var.cicd.existing_gh_conn_name != null || var.cicd.github_config != null
     error_message = "Either github_config or existing_gh_conn_name must be provided when cicd.enable is set to true."
   }
 }
@@ -47,13 +47,13 @@ variable "default_branch_name" {
 variable "dns_config" {
   description = "Configuration for DNS settings."
   type = object({
-    set_dns_config = optional(bool, false)
+    set_dns_config = optional(bool, true)
     zone_name      = optional(string, null)
     domain_name    = string
   })
 
   validation {
-    condition     = !(var.dns_config.set_dns_config) || var.dns_config.zone_name != null
+    condition     = !var.dns_config.set_dns_config || var.dns_config.zone_name != null
     error_message = "zone_name cannot be null when set_dns_config is set to true"
   }
 }
