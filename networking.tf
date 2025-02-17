@@ -16,13 +16,13 @@ resource "google_project_service" "cert_manager_api" {
 
 resource "google_certificate_manager_dns_authorization" "default" {
   for_each   = var.branches
-  name       = "${each.key}-dns-auth"
+  name       = "${var.name_prefix}-${each.key}-dns-auth"
   domain     = each.key == var.default_branch_name ? var.dns_config.domain_name : "${each.key}.${var.dns_config.domain_name}"
   depends_on = [google_project_service.cert_manager_api]
 }
 
 resource "google_certificate_manager_certificate" "default" {
-  name = "website-cert"
+  name = "${var.name_prefix}-website-cert"
 
   managed {
     domains            = [for auth in google_certificate_manager_dns_authorization.default : auth.domain]
@@ -31,12 +31,12 @@ resource "google_certificate_manager_certificate" "default" {
 }
 
 resource "google_certificate_manager_certificate_map" "default" {
-  name       = "website-cert-map"
+  name       = "${var.name_prefix}-website-cert-map"
   depends_on = [google_project_service.cert_manager_api]
 }
 
 resource "google_certificate_manager_certificate_map_entry" "default" {
-  name         = "cert-map-entry"
+  name         = "${var.name_prefix}-cert-map-entry"
   matcher      = "PRIMARY"
   map          = google_certificate_manager_certificate_map.default.name
   certificates = [google_certificate_manager_certificate.default.id]
@@ -47,18 +47,18 @@ resource "google_certificate_manager_certificate_map_entry" "default" {
 #####################
 
 resource "google_compute_global_address" "default" {
-  name = "website-ip"
+  name = "${var.name_prefix}-website-ip"
 }
 
 resource "google_compute_backend_bucket" "backends" {
   for_each    = var.branches
-  name        = each.key
+  name        = "${var.name_prefix}-${each.key}-backend"
   bucket_name = google_storage_bucket.website_bucket[each.key].name
   enable_cdn  = var.enable_cdn
 }
 
 resource "google_compute_url_map" "default" {
-  name = "https-lb"
+  name = "${var.name_prefix}-https-lb"
 
   default_service = google_compute_backend_bucket.backends[var.default_branch_name].id
 
@@ -85,13 +85,13 @@ resource "google_compute_url_map" "default" {
 }
 
 resource "google_compute_target_https_proxy" "default" {
-  name            = "https-lb-proxy"
+  name            = "${var.name_prefix}-https-lb-proxy"
   url_map         = google_compute_url_map.default.id
   certificate_map = "//certificatemanager.googleapis.com/${google_certificate_manager_certificate_map.default.id}"
 }
 
 resource "google_compute_global_forwarding_rule" "default" {
-  name                  = "https-lb-forwarding-rule"
+  name                  = "${var.name_prefix}-https-lb-forwarding-rule"
   ip_protocol           = "TCP"
   load_balancing_scheme = "EXTERNAL_MANAGED"
   port_range            = "443"
@@ -105,7 +105,7 @@ resource "google_compute_global_forwarding_rule" "default" {
 
 resource "google_compute_url_map" "http_redirect_url_map" {
   count = var.enable_http_redirect ? 1 : 0
-  name  = "http-redirect-lb"
+  name  = "${var.name_prefix}-http-redirect-lb"
 
   default_url_redirect {
     https_redirect         = true
@@ -116,13 +116,13 @@ resource "google_compute_url_map" "http_redirect_url_map" {
 
 resource "google_compute_target_http_proxy" "http_redirect_proxy" {
   count   = var.enable_http_redirect ? 1 : 0
-  name    = "https-redirect-proxy"
+  name    = "${var.name_prefix}-https-redirect-proxy"
   url_map = google_compute_url_map.http_redirect_url_map[0].id
 }
 
 resource "google_compute_global_forwarding_rule" "http_forwarding_rule" {
   count                 = var.enable_http_redirect ? 1 : 0
-  name                  = "http-redirect-forwarding-rule"
+  name                  = "${var.name_prefix}-http-redirect-forwarding-rule"
   load_balancing_scheme = "EXTERNAL_MANAGED"
   target                = google_compute_target_http_proxy.http_redirect_proxy[0].id
   port_range            = "80"

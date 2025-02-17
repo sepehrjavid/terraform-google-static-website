@@ -9,7 +9,7 @@ resource "random_string" "bucket_suffix" {
 
 resource "google_storage_bucket" "website_bucket" {
   for_each                    = var.branches
-  name                        = "${each.value}-website-bucket-${random_string.bucket_suffix[each.key].result}"
+  name                        = "${var.name_prefix}-${each.value}-website-bucket-${random_string.bucket_suffix[each.key].result}"
   location                    = data.google_client_config.client_config.region
   storage_class               = "STANDARD"
   force_destroy               = true

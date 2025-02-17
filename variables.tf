@@ -3,20 +3,26 @@ variable "branches" {
   type        = set(string)
 }
 
-variable "github_config" {
-  description = "GitHub configuration details."
+variable "cicd" {
+  description = "CI/CD configuration"
   type = object({
-    access_token        = string
-    app_installation_id = string
-    repo_uri            = string
+    enable = optional(bool, true)
+    github_config = optional(object({
+      access_token        = string
+      app_installation_id = string
+      repo_uri            = string
+    }), null)
   })
   sensitive = true
+  validation {
+    condition     = !var.cicd.enable || github_config != null
+    error_message = "github_config is required when cicd.enable is set to true."
+  }
 }
 
-variable "enable_cicd" {
-  description = "Enables CI/CD for automated deployments."
-  type        = bool
-  default     = true
+variable "name_prefix" {
+  description = "Name prefix used to distinguish workloads"
+  type        = string
 }
 
 variable "enable_cdn" {

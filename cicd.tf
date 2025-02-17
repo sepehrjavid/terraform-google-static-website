@@ -1,5 +1,5 @@
 resource "google_project_service" "project" {
-  for_each = var.enable_cicd ? toset(["secretmanager.googleapis.com", "cloudbuild.googleapis.com"]) : []
+  for_each = var.cicd.enable ? toset(["secretmanager.googleapis.com", "cloudbuild.googleapis.com"]) : []
   service  = each.value
 
   timeouts {
@@ -12,7 +12,8 @@ resource "google_project_service" "project" {
 }
 
 resource "google_secret_manager_secret" "github_token_secret" {
-  secret_id = "github_access_token"
+  count     = var.cicd.enable ? 1 : 0
+  secret_id = "${var.name_prefix}-github_access_token"
 
   replication {
     auto {}
@@ -22,11 +23,14 @@ resource "google_secret_manager_secret" "github_token_secret" {
 }
 
 resource "google_secret_manager_secret_version" "github_token_secret_version" {
-  secret      = google_secret_manager_secret.github_token_secret.id
-  secret_data = var.github_config.access_token
+  count       = var.cicd.enable ? 1 : 0
+  secret      = google_secret_manager_secret.github_token_secret[0].id
+  secret_data = var.cicd.github_config.access_token
 }
 
 data "google_iam_policy" "serviceagent_secretAccessor" {
+  count = var.cicd.enable ? 1 : 0
+
   binding {
     role    = "roles/secretmanager.secretAccessor"
     members = ["serviceAccount:service-${data.google_project.project.number}@gcp-sa-cloudbuild.iam.gserviceaccount.com"]
@@ -34,64 +38,66 @@ data "google_iam_policy" "serviceagent_secretAccessor" {
 }
 
 resource "google_secret_manager_secret_iam_policy" "policy" {
-  project     = google_secret_manager_secret.github_token_secret.project
-  secret_id   = google_secret_manager_secret.github_token_secret.secret_id
-  policy_data = data.google_iam_policy.serviceagent_secretAccessor.policy_data
+  count       = var.cicd.enable ? 1 : 0
+  project     = google_secret_manager_secret.github_token_secret[0].project
+  secret_id   = google_secret_manager_secret.github_token_secret[0].secret_id
+  policy_data = data.google_iam_policy.serviceagent_secretAccessor[0].policy_data
 }
 
 resource "google_cloudbuildv2_connection" "git_connection" {
+  count    = var.cicd.enable ? 1 : 0
   location = data.google_client_config.client_config.region
-  name     = "repository"
+  name     = "${var.name_prefix}-gh-connection"
 
   github_config {
-    app_installation_id = var.github_config.app_installation_id
+    app_installation_id = var.cicd.github_config.app_installation_id
     authorizer_credential {
-      oauth_token_secret_version = google_secret_manager_secret_version.github_token_secret_version.id
+      oauth_token_secret_version = google_secret_manager_secret_version[0].id
     }
   }
   depends_on = [google_secret_manager_secret_iam_policy.policy]
 }
 
 resource "google_cloudbuildv2_repository" "git_repository" {
+  count             = var.cicd.enable ? 1 : 0
   location          = data.google_client_config.client_config.region
-  name              = "website-repo"
-  parent_connection = google_cloudbuildv2_connection.git_connection.name
-  remote_uri        = var.github_config.repo_uri
+  name              = "${var.name_prefix}-website-repo"
+  parent_connection = google_cloudbuildv2_connection.git_connection[0].name
+  remote_uri        = var.cicd.github_config.repo_uri
 }
 
 resource "google_service_account" "website_build_sa" {
-  for_each     = var.branches
-  account_id   = "${each.key}-website-build-sa"
+  for_each     = var.cicd.enable ? var.branches : {}
+  account_id   = "${var.name_prefix}-${each.key}-website-build-sa"
   display_name = "website Cloud Build SA"
 }
 
 resource "google_project_iam_member" "website_log_writer" {
-  for_each = google_service_account.website_build_sa
+  for_each = var.cicd.enable ? google_service_account.website_build_sa : {}
   project  = data.google_client_config.client_config.project
   role     = "roles/logging.logWriter"
   member   = "serviceAccount:${google_service_account.website_build_sa[each.key].email}"
 }
 
 resource "google_storage_bucket_iam_member" "build_sa_write_access" {
-  for_each = var.branches
+  for_each = var.cicd.enable ? var.branches : {}
   bucket   = google_storage_bucket.website_bucket[each.key].name
   role     = "roles/storage.legacyBucketWriter"
   member   = "serviceAccount:${google_service_account.website_build_sa[each.key].email}"
 }
 
 resource "google_cloudbuild_trigger" "git_trigger" {
-  for_each        = var.branches
+  for_each        = var.cicd.enable ? var.branches : {}
   name            = each.value
   location        = data.google_client_config.client_config.region
   service_account = google_service_account.website_build_sa[each.key].id
   filename        = "cloudbuild.yaml"
 
   repository_event_config {
-    repository = google_cloudbuildv2_repository.git_repository.id
+    repository = google_cloudbuildv2_repository.git_repository[0].id
 
     push {
       branch = each.value
     }
   }
 }
-
