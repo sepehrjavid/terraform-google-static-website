@@ -13,3 +13,7 @@ output "dns_auth_creds" {
     }
   }
 }
+
+output "github_connection_name" {
+  value = google_cloudbuildv2_connection.git_connection.name
+}
