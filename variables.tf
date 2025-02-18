@@ -14,7 +14,6 @@ variable "cicd" {
       repo_uri            = string
     }), null)
   })
-  # sensitive = true
   validation {
     condition     = !var.cicd.enable || var.cicd.existing_gh_conn_name != null || var.cicd.github_config != null
     error_message = "Either github_config or existing_gh_conn_name must be provided when cicd.enable is set to true."

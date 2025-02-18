@@ -1,3 +1,7 @@
+locals {
+  github_access_token = sensitive(var.cicd.github_config.access_token)
+}
+
 resource "google_project_service" "project" {
   for_each = var.cicd.enable ? toset(["secretmanager.googleapis.com", "cloudbuild.googleapis.com"]) : []
   service  = each.value
@@ -25,7 +29,7 @@ resource "google_secret_manager_secret" "github_token_secret" {
 resource "google_secret_manager_secret_version" "github_token_secret_version" {
   count       = var.cicd.enable && var.cicd.existing_gh_conn_name == null ? 1 : 0
   secret      = google_secret_manager_secret.github_token_secret[0].id
-  secret_data = var.cicd.github_config.access_token
+  secret_data = local.github_access_token
 }
 
 data "google_iam_policy" "serviceagent_secretAccessor" {
