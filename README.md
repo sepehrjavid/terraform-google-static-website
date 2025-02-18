@@ -18,8 +18,7 @@ You can configure the module using the following variables:
 | Variable               | Type            | Description                                                                                      | Default       | Example                                      |
 |------------------------|----------------|------------------------------------------------------------------------------------------------|---------------|----------------------------------------------|
 | `branches`            | `set(string)`   | Set of branch names that need deployment.                                                     | None       | `[ "main", "develop" ]`                   |
-| `github_config`       | `object`        | GitHub configuration details.                                                                 | None       | See structure below.                           |
-| `enable_cicd`         | `bool`          | Enables CI/CD for automated deployments.                                                      | None       | `true`                                       |
+| `cicd`         | `object`          | CI/CD config for automated deployments.                                                      | None       | See structure below                                       |
 | `enable_cdn`         | `bool`          | Enables Cloud CDN for better performance.                                                     | `true`       | `true`                                       |
 | `enable_http_redirect`| `bool`          | Enables HTTP to HTTPS redirection.                                                            | `true`       | `true`                                       |
 | `default_branch_name` | `string`        | The name of the default production branch.                                                   | `"main"`       | `"main"`                                    |
@@ -29,9 +28,22 @@ You can configure the module using the following variables:
 
 **Note: The varibales with default value of `None` are required.**
 
+### CI/CD Configuration Object Structure
+
+`cicd` object consists of the following variables:
+
+| Variable               | Type            | Description                                                                                      | Default       | Example                                      |
+|------------------------|----------------|------------------------------------------------------------------------------------------------|---------------|----------------------------------------------|
+| `enable`            | `bool`   | Whether to enable CI/CD                                                     | `true`       | `false`                   |
+| `existing_gh_conn_name`       | `string`        | The name of an existing github connection in CloudBuild                                                                 | None       | `my_connection`                           |
+| `github_config`         | `object`          | GitHub configuration details.                                                       | None       | See structure below  
+
+
+**Note: `github_config` is only required if `enable` is  `true`**
+
 ### GitHub Configuration Object Structure
 
-Each `github_config` object consists of the following variables:
+`github_config` object consists of the following variables:
 
 | Variable               | Type            | Description                                                                                      | Default       | Example                                      |
 |------------------------|----------------|------------------------------------------------------------------------------------------------|---------------|----------------------------------------------|
@@ -42,7 +54,7 @@ Each `github_config` object consists of the following variables:
 
 ### DNS Configuration Object Structure
 
-Each `dns_config` object consists of the following variables:
+`dns_config` object consists of the following variables:
 
 | Variable               | Type            | Description                                                                                      | Default       | Example                                      |
 |------------------------|----------------|------------------------------------------------------------------------------------------------|---------------|----------------------------------------------|
@@ -55,13 +67,15 @@ Each `dns_config` object consists of the following variables:
 ```hcl
 branches = ["main", "develop"]
 
-github_config = {
-  access_token        = "ghp_abcdef1234567890"
-  app_installation_id = "1234567"
-  repo_uri            = "https://github.com/example/app"
+cicd = {
+  enable = true
+  github_config = {
+    access_token        = "ghp_abcdef1234567890"
+    app_installation_id = "1234567"
+    repo_uri            = "https://github.com/example/app"
+  }
 }
 
-enable_cicd = true
 enable_cdn = true
 enable_http_redirect = true
 default_branch_name = "main"
