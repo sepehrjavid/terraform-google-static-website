@@ -88,7 +88,7 @@ resource "google_storage_bucket_iam_member" "build_sa_write_access" {
 
 resource "google_cloudbuild_trigger" "git_trigger" {
   for_each        = var.cicd.enable ? var.branches : []
-  name            = each.value
+  name            = "${var.name_prefix}-${each.value}"
   location        = data.google_client_config.client_config.region
   service_account = google_service_account.website_build_sa[each.key].id
   filename        = "cloudbuild.yaml"
