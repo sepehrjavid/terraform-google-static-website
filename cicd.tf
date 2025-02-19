@@ -1,5 +1,5 @@
 locals {
-  github_access_token = sensitive(var.cicd.github_config.access_token)
+  github_access_token = try(sensitive(var.cicd.github_config.access_token), null)
 }
 
 resource "google_project_service" "project" {
