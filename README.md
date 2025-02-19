@@ -18,6 +18,7 @@ You can configure the module using the following variables:
 | Variable               | Type            | Description                                                                                      | Default       | Example                                      |
 |------------------------|----------------|------------------------------------------------------------------------------------------------|---------------|----------------------------------------------|
 | `branches`            | `set(string)`   | Set of branch names that need deployment.                                                     | None       | `[ "main", "develop" ]`                   |
+| `name_prefix`         | `string`          | Name prefix used to distinguish resource.                                                      | None       | `"my-test"`                                     | 
 | `cicd`         | `object`          | CI/CD config for automated deployments.                                                      | None       | See structure below                                       |
 | `enable_cdn`         | `bool`          | Enables Cloud CDN for better performance.                                                     | `true`       | `true`                                       |
 | `enable_http_redirect`| `bool`          | Enables HTTP to HTTPS redirection.                                                            | `true`       | `true`                                       |

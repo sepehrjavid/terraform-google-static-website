@@ -21,7 +21,7 @@ variable "cicd" {
 }
 
 variable "name_prefix" {
-  description = "Name prefix used to distinguish workloads"
+  description = "Name prefix used to distinguish resources"
   type        = string
 }
 
@@ -46,7 +46,7 @@ variable "default_branch_name" {
 variable "dns_config" {
   description = "Configuration for DNS settings."
   type = object({
-    set_dns_config = optional(bool, true)
+    set_dns_config = optional(bool, false)
     zone_name      = optional(string, null)
     domain_name    = string
   })
