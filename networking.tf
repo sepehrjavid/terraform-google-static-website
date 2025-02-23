@@ -1,6 +1,6 @@
-#########################
-##  Certificate Setup  ##
-#########################
+###########################
+##   Certificate Setup   ##
+###########################
 
 resource "google_project_service" "cert_manager_api" {
   service = "certificatemanager.googleapis.com"

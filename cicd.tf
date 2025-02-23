@@ -15,15 +15,21 @@ resource "google_project_service" "project" {
   disable_dependent_services = true
 }
 
+resource "time_sleep" "wait_30_seconds" {
+  depends_on = [google_project_service.project]
+
+  create_duration = "30s"
+}
+
 resource "google_secret_manager_secret" "github_token_secret" {
   count     = var.cicd.enable && var.cicd.existing_gh_conn_name == null ? 1 : 0
-  secret_id = "${var.name_prefix}-github_access_token"
+  secret_id = "github_access_token"
 
   replication {
     auto {}
   }
 
-  depends_on = [google_project_service.project]
+  depends_on = [time_sleep.wait_30_seconds]
 }
 
 resource "google_secret_manager_secret_version" "github_token_secret_version" {
@@ -51,7 +57,7 @@ resource "google_secret_manager_secret_iam_policy" "policy" {
 resource "google_cloudbuildv2_connection" "git_connection" {
   count    = var.cicd.enable && var.cicd.existing_gh_conn_name == null ? 1 : 0
   location = data.google_client_config.client_config.region
-  name     = "${var.name_prefix}-gh-connection"
+  name     = "gh-connection"
 
   github_config {
     app_installation_id = var.cicd.github_config.app_installation_id
