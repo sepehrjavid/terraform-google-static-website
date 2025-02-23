@@ -1,3 +1,7 @@
+locals {
+  domain_name = try(google_dns_managed_zone[0].default_zone.dns_name, var.dns_config.domain_name)
+}
+
 ###########################
 ##   Certificate Setup   ##
 ###########################
@@ -17,7 +21,7 @@ resource "google_project_service" "cert_manager_api" {
 resource "google_certificate_manager_dns_authorization" "default" {
   for_each   = var.branches
   name       = "${var.name_prefix}-${each.key}-dns-auth"
-  domain     = each.key == var.default_branch_name ? var.dns_config.domain_name : "${each.key}.${var.dns_config.domain_name}"
+  domain     = each.key == var.default_branch_name ? local.domain_name : "${each.key}.${local.domain_name}"
   depends_on = [google_project_service.cert_manager_api]
 }
 
@@ -65,7 +69,7 @@ resource "google_compute_url_map" "default" {
   dynamic "host_rule" {
     for_each = var.branches
     content {
-      hosts        = [host_rule.value == var.default_branch_name ? var.dns_config.domain_name : "${host_rule.value}.${var.dns_config.domain_name}"]
+      hosts        = [host_rule.value == var.default_branch_name ? local.domain_name : "${host_rule.value}.${local.domain_name}"]
       path_matcher = "${host_rule.value}-matcher"
     }
   }

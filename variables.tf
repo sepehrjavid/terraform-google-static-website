@@ -48,11 +48,16 @@ variable "dns_config" {
   type = object({
     set_dns_config = optional(bool, false)
     zone_name      = optional(string, null)
-    domain_name    = string
+    domain_name    = optional(string, null)
   })
 
   validation {
     condition     = !var.dns_config.set_dns_config || var.dns_config.zone_name != null
     error_message = "zone_name cannot be null when set_dns_config is set to true"
+  }
+
+  validation {
+    condition     = var.dns_config.domain_name != null || var.dns_config.zone_name != null
+    error_message = "Domain name is required when zone_name is null"
   }
 }
