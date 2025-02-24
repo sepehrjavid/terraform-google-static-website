@@ -1,7 +1,3 @@
-locals {
-  domain_name = try(google_dns_managed_zone[0].default_zone.dns_name, var.dns_config.domain_name)
-}
-
 ###########################
 ##   Certificate Setup   ##
 ###########################

@@ -1,7 +1,3 @@
-locals {
-  domain_name = try(google_dns_managed_zone[0].default_zone.dns_name, var.dns_config.domain_name)
-}
-
 resource "google_dns_record_set" "cert_auth" {
   for_each     = var.dns_config.set_dns_config ? var.branches : []
   name         = google_certificate_manager_dns_authorization.default[each.key].dns_resource_record[0].name
