@@ -9,15 +9,21 @@ variable "cicd" {
     enable                = optional(bool, true)
     existing_gh_conn_name = optional(string, null)
     github_config = optional(object({
-      access_token        = string
-      app_installation_id = string
-      repo_uri            = string
+      access_token                     = optional(string, null)
+      existing_token_secret_version_id = optional(string, null)
+      app_installation_id              = string
+      repo_uri                         = string
     }), null)
   })
   validation {
     condition     = !var.cicd.enable || var.cicd.existing_gh_conn_name != null || var.cicd.github_config != null
     error_message = "Either github_config or existing_gh_conn_name must be provided when cicd.enable is set to true."
   }
+  validation {
+    condition     = var.cicd.github_config == null || var.cicd.github_config.access_token != null || var.cicd.github_config.existing_token_secret_version_id != null
+    error_message = "When github_config is provided, either access_token or existing_token_secret_version_id must have a value."
+  }
+
 }
 
 variable "name_prefix" {

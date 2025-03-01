@@ -1,5 +1,8 @@
 locals {
-  github_access_token = try(sensitive(var.cicd.github_config.access_token), null)
+  gh_token_secret_version_id = try(var.cicd.github_config.existing_token_secret_version_id, null)
+  github_access_token        = try(sensitive(var.cicd.github_config.access_token), null)
+  create_gh_connection       = var.cicd.enable && var.cicd.existing_gh_conn_name == null
+  create_secret              = local.create_gh_connection && local.gh_token_secret_version_id == null
 }
 
 resource "google_project_service" "project" {
@@ -11,8 +14,6 @@ resource "google_project_service" "project" {
     update = "40m"
   }
 
-  disable_on_destroy         = true
-  disable_dependent_services = true
 }
 
 resource "time_sleep" "wait_30_seconds" {
@@ -22,7 +23,7 @@ resource "time_sleep" "wait_30_seconds" {
 }
 
 resource "google_secret_manager_secret" "github_token_secret" {
-  count     = var.cicd.enable && var.cicd.existing_gh_conn_name == null ? 1 : 0
+  count     = local.create_secret ? 1 : 0
   secret_id = "github_access_token"
 
   replication {
@@ -33,13 +34,13 @@ resource "google_secret_manager_secret" "github_token_secret" {
 }
 
 resource "google_secret_manager_secret_version" "github_token_secret_version" {
-  count       = var.cicd.enable && var.cicd.existing_gh_conn_name == null ? 1 : 0
+  count       = local.create_secret ? 1 : 0
   secret      = google_secret_manager_secret.github_token_secret[0].id
   secret_data = local.github_access_token
 }
 
 data "google_iam_policy" "serviceagent_secretAccessor" {
-  count = var.cicd.enable && var.cicd.existing_gh_conn_name == null ? 1 : 0
+  count = local.create_secret ? 1 : 0
 
   binding {
     role    = "roles/secretmanager.secretAccessor"
@@ -48,21 +49,24 @@ data "google_iam_policy" "serviceagent_secretAccessor" {
 }
 
 resource "google_secret_manager_secret_iam_policy" "policy" {
-  count       = var.cicd.enable && var.cicd.existing_gh_conn_name == null ? 1 : 0
+  count       = local.create_secret ? 1 : 0
   project     = google_secret_manager_secret.github_token_secret[0].project
   secret_id   = google_secret_manager_secret.github_token_secret[0].secret_id
   policy_data = data.google_iam_policy.serviceagent_secretAccessor[0].policy_data
 }
 
 resource "google_cloudbuildv2_connection" "git_connection" {
-  count    = var.cicd.enable && var.cicd.existing_gh_conn_name == null ? 1 : 0
+  count    = local.create_gh_connection ? 1 : 0
   location = data.google_client_config.client_config.region
   name     = "gh-connection"
 
   github_config {
     app_installation_id = var.cicd.github_config.app_installation_id
     authorizer_credential {
-      oauth_token_secret_version = google_secret_manager_secret_version.github_token_secret_version[0].id
+      oauth_token_secret_version = coalesce(
+        local.gh_token_secret_version_id,
+        try(google_secret_manager_secret_version.github_token_secret_version[0].id, null)
+      )
     }
   }
   depends_on = [google_secret_manager_secret_iam_policy.policy]

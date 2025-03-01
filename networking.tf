@@ -14,11 +14,17 @@ resource "google_project_service" "cert_manager_api" {
   disable_dependent_services = true
 }
 
+resource "time_sleep" "wait_30_seconds_cert" {
+  depends_on = [google_project_service.cert_manager_api]
+
+  create_duration = "30s"
+}
+
 resource "google_certificate_manager_dns_authorization" "default" {
   for_each   = var.branches
   name       = "${var.name_prefix}-${each.key}-dns-auth"
   domain     = each.key == var.default_branch_name ? local.domain_name : "${each.key}.${local.domain_name}"
-  depends_on = [google_project_service.cert_manager_api]
+  depends_on = [time_sleep.wait_30_seconds_cert]
 }
 
 resource "google_certificate_manager_certificate" "default" {
@@ -32,7 +38,7 @@ resource "google_certificate_manager_certificate" "default" {
 
 resource "google_certificate_manager_certificate_map" "default" {
   name       = "${var.name_prefix}-website-cert-map"
-  depends_on = [google_project_service.cert_manager_api]
+  depends_on = [time_sleep.wait_30_seconds_cert]
 }
 
 resource "google_certificate_manager_certificate_map_entry" "default" {
