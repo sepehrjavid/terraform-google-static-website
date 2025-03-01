@@ -10,8 +10,8 @@ resource "google_project_service" "cert_manager_api" {
     update = "40m"
   }
 
-  disable_on_destroy         = true
-  disable_dependent_services = true
+  # disable_on_destroy         = true
+  # disable_dependent_services = true
 }
 
 resource "time_sleep" "wait_30_seconds_cert" {
