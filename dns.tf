@@ -9,7 +9,7 @@ resource "google_dns_record_set" "cert_auth" {
 
 resource "google_dns_record_set" "website_ip_record" {
   count        = var.dns_config.set_dns_config ? 1 : 0
-  name         = "${var.dns_config.domain_name}."
+  name         = "${local.domain_name}."
   managed_zone = var.dns_config.zone_name
   type         = "A"
   ttl          = 300
@@ -18,10 +18,10 @@ resource "google_dns_record_set" "website_ip_record" {
 
 resource "google_dns_record_set" "website_dub_domanins" {
   for_each     = var.dns_config.set_dns_config ? { for branch in var.branches : branch => branch if branch != var.default_branch_name } : {}
-  name         = "${each.key}.${var.dns_config.domain_name}."
+  name         = "${each.key}.${local.domain_name}."
   managed_zone = var.dns_config.zone_name
   type         = "CNAME"
   ttl          = 300
-  rrdatas      = ["${var.dns_config.domain_name}."]
+  rrdatas      = ["${local.domain_name}."]
 }
 

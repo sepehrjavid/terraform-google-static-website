@@ -1,6 +1,6 @@
-#########################
-##  Certificate Setup  ##
-#########################
+###########################
+##   Certificate Setup   ##
+###########################
 
 resource "google_project_service" "cert_manager_api" {
   service = "certificatemanager.googleapis.com"
@@ -10,15 +10,21 @@ resource "google_project_service" "cert_manager_api" {
     update = "40m"
   }
 
-  disable_on_destroy         = true
-  disable_dependent_services = true
+  disable_on_destroy = false
+  # disable_dependent_services = true
+}
+
+resource "time_sleep" "wait_30_seconds_cert" {
+  depends_on = [google_project_service.cert_manager_api]
+
+  create_duration = "30s"
 }
 
 resource "google_certificate_manager_dns_authorization" "default" {
   for_each   = var.branches
   name       = "${var.name_prefix}-${each.key}-dns-auth"
-  domain     = each.key == var.default_branch_name ? var.dns_config.domain_name : "${each.key}.${var.dns_config.domain_name}"
-  depends_on = [google_project_service.cert_manager_api]
+  domain     = each.key == var.default_branch_name ? local.domain_name : "${each.key}.${local.domain_name}"
+  depends_on = [time_sleep.wait_30_seconds_cert]
 }
 
 resource "google_certificate_manager_certificate" "default" {
@@ -32,7 +38,7 @@ resource "google_certificate_manager_certificate" "default" {
 
 resource "google_certificate_manager_certificate_map" "default" {
   name       = "${var.name_prefix}-website-cert-map"
-  depends_on = [google_project_service.cert_manager_api]
+  depends_on = [time_sleep.wait_30_seconds_cert]
 }
 
 resource "google_certificate_manager_certificate_map_entry" "default" {
@@ -65,7 +71,7 @@ resource "google_compute_url_map" "default" {
   dynamic "host_rule" {
     for_each = var.branches
     content {
-      hosts        = [host_rule.value == var.default_branch_name ? var.dns_config.domain_name : "${host_rule.value}.${var.dns_config.domain_name}"]
+      hosts        = [host_rule.value == var.default_branch_name ? local.domain_name : "${host_rule.value}.${local.domain_name}"]
       path_matcher = "${host_rule.value}-matcher"
     }
   }
