@@ -17,17 +17,17 @@ You can configure the module using the following variables:
 
 | Variable               | Type            | Description                                                                                      | Default       | Example                                      |
 |------------------------|----------------|------------------------------------------------------------------------------------------------|---------------|----------------------------------------------|
-| `branches`            | `set(string)`   | Set of branch names that need deployment.                                                     | None       | `[ "main", "develop" ]`                   |
-| `name_prefix`         | `string`          | Name prefix used to distinguish resource.                                                      | None       | `"my-test"`                                     | 
-| `cicd`         | `object`          | CI/CD config for automated deployments.                                                      | None       | See structure below                                       |
+| `branches`            | `set(string)`   | Set of branch names that need deployment.                                                     | `null`       | `[ "main", "develop" ]`                   |
+| `name_prefix`         | `string`          | Name prefix used to distinguish resource.                                                      | `null`       | `"my-test"`                                     | 
+| `cicd`         | `object`          | CI/CD config for automated deployments.                                                      | `null`       | See structure below                                       |
 | `enable_cdn`         | `bool`          | Enables Cloud CDN for better performance.                                                     | `true`       | `true`                                       |
 | `enable_http_redirect`| `bool`          | Enables HTTP to HTTPS redirection.                                                            | `true`       | `true`                                       |
 | `default_branch_name` | `string`        | The name of the default production branch.                                                   | `"main"`       | `"main"`                                    |
-| `dns_config`         | `object`        | Configuration for DNS settings.                                                              | None       | See structure below.                           |
+| `dns_config`         | `object`        | Configuration for DNS settings.                                                              | `null`       | See structure below.                           |
 
 
 
-**Note: The varibales with default value of `None` are required.**
+**Note: The varibales with default value of `null` are required.**
 
 ### CI/CD Configuration Object Structure
 
@@ -36,11 +36,12 @@ You can configure the module using the following variables:
 | Variable               | Type            | Description                                                                                      | Default       | Example                                      |
 |------------------------|----------------|------------------------------------------------------------------------------------------------|---------------|----------------------------------------------|
 | `enable`            | `bool`   | Whether to enable CI/CD                                                     | `true`       | `false`                   |
-| `existing_gh_conn_name`       | `string`        | The name of an existing github connection in CloudBuild                                                                 | None       | `my_connection`                           |
-| `github_config`         | `object`          | GitHub configuration details.                                                       | None       | See structure below  
+| `existing_gh_conn_name`       | `string`        | The name of an existing github connection in CloudBuild                                                                 | `null`       | `my_connection`                           |
+| `build_config_filename`         | `string`          | The name of the Cloud Build config file.                                                       | `cloudbuild.yaml`       | `build.yaml` 
+| `github_config`         | `object`          | GitHub configuration details.                                                       | `null`       | See structure below  
 
 
-**Note: `github_config` is only required if `enable` is  `true`**
+**Note: Either `existing_gh_conn_name` or `github_config` must be provided when `enable` is `true`.**
 
 ### GitHub Configuration Object Structure
 
@@ -48,9 +49,12 @@ You can configure the module using the following variables:
 
 | Variable               | Type            | Description                                                                                      | Default       | Example                                      |
 |------------------------|----------------|------------------------------------------------------------------------------------------------|---------------|----------------------------------------------|
-| `access_token`            | `string`   | GitHub access token                                                     | None       | `ghp_************************************`                   |
-| `app_installation_id`       | `string`        | GitHub App installation                                                                 | None       | `https://github.com/my_repo.git`                           |
-| `repo_uri`         | `string`          | Repository URI                                                       | None       | `12345678`                                       |
+| `access_token`            | `string`   | GitHub access token                                                     | `null`       | `ghp_************************************`                   |
+| `existing_token_secret_version_id`            | `string`   | Existing Secret Manager version ID where the GitHub token is stored.                                                     | `null`       | `projects/123/secrets/my-secret/versions/1`                  |
+| `app_installation_id`       | `string`        | GitHub App installation                                                                 | `null`       | `https://github.com/my_repo.git`                           |
+| `repo_uri`         | `string`          | Repository URI                                                       | `null`       | `12345678`                                       |
+
+**Note: When `github_config` is provided, either `access_token` or `existing_token_secret_version_id` must have a value.**
 
 
 ### DNS Configuration Object Structure
@@ -60,8 +64,13 @@ You can configure the module using the following variables:
 | Variable               | Type            | Description                                                                                      | Default       | Example                                      |
 |------------------------|----------------|------------------------------------------------------------------------------------------------|---------------|----------------------------------------------|
 | `set_dns_config`            | `bool`   |  Whether to configure DNS settings.                                                     | `false`       | `true`                   |
-| `zone_name`       | `string`        |  DNS Zone Name (If created in GCP) (Required if `set_dns_config` is true).                                                                 | None       | `example-com`                           |
-| `domain_name`         | `string`          | Domain Name for the website.                                                       | None       | `example.com`                                       |
+| `zone_name`       | `string`        |  DNS Zone Name (If created in GCP) (Required if `set_dns_config` is true).                                                                 | `null`       | `example-com`                           |
+| `domain_name`         | `string`          | Domain Name for the website.                                                       | `null`       | `example.com`                                       |
+
+
+**Note:**
+- If `set_dns_config` is `true`, `zone_name` must be provided.
+- At all times either `domain_name` or `set_dns_config` must be specified. (the domain name is derived from the zone when `domain_name` is not provided.)
 
 ### Example Values
 
@@ -69,11 +78,12 @@ You can configure the module using the following variables:
 branches = ["main", "develop"]
 
 cicd = {
-  enable = true
+  enable                = true
+  build_config_filename = "mycloudbuild.yaml"
   github_config = {
-    access_token        = "ghp_abcdef1234567890"
-    app_installation_id = "1234567"
-    repo_uri            = "https://github.com/example/app"
+    access_token                     = "ghp_abcdef1234567890"
+    app_installation_id              = "1234567"
+    repo_uri                         = "https://github.com/example/app"
   }
 }
 
@@ -83,8 +93,7 @@ default_branch_name = "main"
 
 dns_config = {
   set_dns_config = true
-  zone_name      = "example-zone"
-  domain_name    = "example.com"
+  zone_name      = "example-zone" # example.com
 }
 ```
 
