@@ -106,7 +106,7 @@ resource "google_cloudbuild_trigger" "git_trigger" {
   name            = "${var.name_prefix}-${each.value}"
   location        = data.google_client_config.client_config.region
   service_account = google_service_account.website_build_sa[each.key].id
-  filename        = "cloudbuild.yaml"
+  filename        = var.cicd.build_config_filename
 
   repository_event_config {
     repository = google_cloudbuildv2_repository.git_repository[0].id

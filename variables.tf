@@ -8,6 +8,7 @@ variable "cicd" {
   type = object({
     enable                = optional(bool, true)
     existing_gh_conn_name = optional(string, null)
+    build_config_filename = optional(string, "cloudbuild.yaml")
     github_config = optional(object({
       access_token                     = optional(string, null)
       existing_token_secret_version_id = optional(string, null)
