@@ -1,15 +1,6 @@
-resource "random_string" "bucket_suffix" {
-  for_each = var.branches
-  length   = 4
-  lower    = true
-  upper    = false
-  numeric  = false
-  special  = false
-}
-
 resource "google_storage_bucket" "website_bucket" {
   for_each                    = var.branches
-  name                        = "${var.name_prefix}-${each.value}-website-bucket-${random_string.bucket_suffix[each.key].result}"
+  name                        = "${var.name_prefix}-${each.value}-website-bucket"
   location                    = data.google_client_config.client_config.region
   storage_class               = "STANDARD"
   force_destroy               = true
