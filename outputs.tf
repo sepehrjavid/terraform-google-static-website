@@ -19,5 +19,5 @@ output "github_connection_name" {
 }
 
 output "buckets" {
-  value = { for k in var.var.branches : k => google_storage_bucket.website_bucket[k].name }
+  value = { for k in var.branches : k => google_storage_bucket.website_bucket[k].name }
 }
