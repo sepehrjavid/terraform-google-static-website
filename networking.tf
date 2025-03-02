@@ -10,7 +10,7 @@ resource "google_project_service" "cert_manager_api" {
     update = "40m"
   }
 
-  # disable_on_destroy         = true
+  disable_on_destroy = false
   # disable_dependent_services = true
 }
 
