@@ -37,11 +37,14 @@ You can configure the module using the following variables:
 |------------------------|----------------|------------------------------------------------------------------------------------------------|---------------|----------------------------------------------|
 | `enable`            | `bool`   | Whether to enable CI/CD                                                     | `true`       | `false`                   |
 | `existing_gh_conn_name`       | `string`        | The name of an existing github connection in CloudBuild                                                                 | `null`       | `my_connection`                           |
+| `repo_uri`         | `string`          | Repository URI                                                       | `null`       | `https://github.com/my_repo.git`                                       |
 | `build_config_filename`         | `string`          | The name of the Cloud Build config file.                                                       | `cloudbuild.yaml`       | `build.yaml` 
 | `github_config`         | `object`          | GitHub configuration details.                                                       | `null`       | See structure below  
 
 
 **Note: Either `existing_gh_conn_name` or `github_config` must be provided when `enable` is `true`.**
+
+**Note: When `enable` is set to `true`, `repo_uri` must be provided. Otherwise can be left undefined**
 
 ### GitHub Configuration Object Structure
 
@@ -51,8 +54,7 @@ You can configure the module using the following variables:
 |------------------------|----------------|------------------------------------------------------------------------------------------------|---------------|----------------------------------------------|
 | `access_token`            | `string`   | GitHub access token                                                     | `null`       | `ghp_************************************`                   |
 | `existing_token_secret_version_id`            | `string`   | Existing Secret Manager version ID where the GitHub token is stored.                                                     | `null`       | `projects/123/secrets/my-secret/versions/1`                  |
-| `app_installation_id`       | `string`        | GitHub App installation                                                                 | `null`       | `https://github.com/my_repo.git`                           |
-| `repo_uri`         | `string`          | Repository URI                                                       | `null`       | `12345678`                                       |
+| `app_installation_id`       | `string`        | GitHub App installation                                                                 | `null`       | `12345678`                           |
 
 **Note: When `github_config` is provided, either `access_token` or `existing_token_secret_version_id` must have a value.**
 
