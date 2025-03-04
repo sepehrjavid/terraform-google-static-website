@@ -15,7 +15,7 @@ output "dns_auth_creds" {
 }
 
 output "github_connection_name" {
-  value = var.cicd.enable ? coalesce(var.cicd.existing_gh_conn_name, google_cloudbuildv2_connection.git_connection[0].name) : null
+  value = var.cicd.enable ? coalesce(var.cicd.existing_gh_conn_name, try(google_cloudbuildv2_connection.git_connection[0].name, null)) : null
 }
 
 output "buckets" {

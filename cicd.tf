@@ -77,8 +77,8 @@ resource "google_cloudbuildv2_repository" "git_repository" {
   count             = var.cicd.enable ? 1 : 0
   location          = data.google_client_config.client_config.region
   name              = "${var.name_prefix}-website-repo"
-  parent_connection = coalesce(var.cicd.existing_gh_conn_name, google_cloudbuildv2_connection.git_connection[0].name)
-  remote_uri        = var.cicd.github_config.repo_uri
+  parent_connection = coalesce(var.cicd.existing_gh_conn_name, try(google_cloudbuildv2_connection.git_connection[0].name, null))
+  remote_uri        = var.cicd.repo_uri
 }
 
 resource "google_service_account" "website_build_sa" {
