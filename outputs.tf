@@ -21,3 +21,7 @@ output "github_connection_name" {
 output "buckets" {
   value = { for k in var.branches : k => google_storage_bucket.website_bucket[k].name }
 }
+
+output "build_sa" {
+  value = var.cicd.enable && var.cicd.build_sa_emails == null? google_service_account.website_build_sa : {}
+}
