@@ -23,5 +23,5 @@ output "buckets" {
 }
 
 output "build_sa" {
-  value = var.cicd.enable && var.cicd.build_sa_ids == null? google_service_account.website_build_sa : {}
+  value = var.cicd.enable && var.cicd.build_sa_ids == null ? google_service_account.website_build_sa : {}
 }
