@@ -10,7 +10,7 @@ variable "cicd" {
     existing_gh_conn_name = optional(string, null)
     build_config_filename = optional(string, "cloudbuild.yaml")
     repo_uri              = optional(string, null)
-    build_sa_emails       = optional(map(string), {})
+    build_sa_ids       = optional(map(string), {})
     github_config = optional(object({
       access_token                     = optional(string, null)
       existing_token_secret_version_id = optional(string, null)
@@ -30,8 +30,8 @@ variable "cicd" {
     error_message = "When github_config is provided, either access_token or existing_token_secret_version_id must have a value."
   }
   validation {
-    condition     = !var.cicd.enable || length(setsubtract(var.branches, keys(var.cicd.build_sa_emails))) == 0
-    error_message = "When cicd.enable is true, each branch in var.branches must have a corresponding key in cicd.build_sa_emails."
+    condition     = !var.cicd.enable || length(setsubtract(var.branches, keys(var.cicd.build_sa_ids))) == 0
+    error_message = "When cicd.enable is true, each branch in var.branches must have a corresponding key in cicd.build_sa_ids."
   }
 }
 

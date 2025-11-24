@@ -82,20 +82,20 @@ resource "google_cloudbuildv2_repository" "git_repository" {
 }
 
 resource "google_service_account" "website_build_sa" {
-  for_each     = var.cicd.enable && var.cicd.build_sa_emails == null? var.branches : []
+  for_each     = var.cicd.enable && var.cicd.build_sa_ids == null? var.branches : []
   account_id   = "${var.name_prefix}-${each.key}-website-build-sa"
   display_name = "website Cloud Build SA"
 }
 
 resource "google_project_iam_member" "website_log_writer" {
-  for_each = var.cicd.enable && var.cicd.build_sa_emails == null? google_service_account.website_build_sa : {}
+  for_each = var.cicd.enable && var.cicd.build_sa_ids == null? google_service_account.website_build_sa : {}
   project  = data.google_client_config.client_config.project
   role     = "roles/logging.logWriter"
   member   = "serviceAccount:${google_service_account.website_build_sa[each.key].email}"
 }
 
 resource "google_storage_bucket_iam_member" "build_sa_write_access" {
-  for_each = var.cicd.enable && var.cicd.build_sa_emails == null&& var.cicd.build_sa_emails == null? var.branches : []
+  for_each = var.cicd.enable && var.cicd.build_sa_ids == null&& var.cicd.build_sa_ids == null? var.branches : []
   bucket   = google_storage_bucket.website_bucket[each.key].name
   role     = "roles/storage.legacyBucketWriter"
   member   = "serviceAccount:${google_service_account.website_build_sa[each.key].email}"
@@ -105,7 +105,7 @@ resource "google_cloudbuild_trigger" "git_trigger" {
   for_each        = var.cicd.enable ? var.branches : []
   name            = "${var.name_prefix}-${each.value}"
   location        = data.google_client_config.client_config.region
-  service_account = try(var.cicd.build_sa_emails[each.value], google_service_account.website_build_sa[each.key].id)
+  service_account = try(var.cicd.build_sa_ids[each.value], google_service_account.website_build_sa[each.key].id)
   filename        = var.cicd.build_config_filename
 
   repository_event_config {
