@@ -97,7 +97,7 @@ resource "google_project_iam_member" "website_log_writer" {
 resource "google_storage_bucket_iam_member" "build_sa_write_access" {
   for_each = var.cicd.enable && var.cicd.build_sa_ids == null ? var.branches : []
   bucket   = google_storage_bucket.website_bucket[each.key].name
-  role     = "roles/storage.objectCreator"
+  role     = "roles/storage.objectUser"
   member   = "serviceAccount:${google_service_account.website_build_sa[each.key].email}"
 }
 
