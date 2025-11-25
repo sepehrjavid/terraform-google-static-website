@@ -95,7 +95,7 @@ resource "google_project_iam_member" "website_log_writer" {
 }
 
 resource "google_storage_bucket_iam_member" "build_sa_write_access" {
-  for_each = var.cicd.enable && var.cicd.build_sa_ids == null && var.cicd.build_sa_ids == null ? var.branches : []
+  for_each = var.cicd.enable && var.cicd.build_sa_ids == null ? var.branches : []
   bucket   = google_storage_bucket.website_bucket[each.key].name
   role     = "roles/storage.objectCreator"
   member   = "serviceAccount:${google_service_account.website_build_sa[each.key].email}"
@@ -105,7 +105,7 @@ resource "google_cloudbuild_trigger" "git_trigger" {
   for_each        = var.cicd.enable ? var.branches : []
   name            = "${var.name_prefix}-${each.value}"
   location        = data.google_client_config.client_config.region
-  service_account = try(var.cicd.build_sa_ids[each.value], google_service_account.website_build_sa[each.key].id)
+  service_account = try(var.cicd.build_sa_ids[each.key], google_service_account.website_build_sa[each.key].id)
   filename        = var.cicd.build_config_filename
 
   repository_event_config {
