@@ -39,12 +39,15 @@ You can configure the module using the following variables:
 | `existing_gh_conn_name`       | `string`        | The name of an existing github connection in CloudBuild                                                                 | `null`       | `my_connection`                           |
 | `repo_uri`         | `string`          | Repository URI                                                       | `null`       | `https://github.com/my_repo.git`                                       |
 | `build_config_filename`         | `string`          | The name of the Cloud Build config file.                                                       | `cloudbuild.yaml`       | `build.yaml` 
+| `build_sa_ids`         | `map(string)`          | A map of service account IDs for Cloud Build, keyed by branch name. If not provided, a service account is created.                                                       | `null`       | `{"main" = "sa-main@p.iam.gserviceaccount.com"}` 
 | `github_config`         | `object`          | GitHub configuration details.                                                       | `null`       | See structure below  
 
 
 **Note: Either `existing_gh_conn_name` or `github_config` must be provided when `enable` is `true`.**
 
 **Note: When `enable` is set to `true`, `repo_uri` must be provided. Otherwise can be left undefined**
+
+**Note: If `build_sa_ids` is provided, it must contain an entry for each branch defined in the `branches` variable.**
 
 ### GitHub Configuration Object Structure
 
@@ -107,4 +110,3 @@ The `dns_config` block controls DNS settings.  The `set_dns_config` variable det
 - Automated DNS (`set_dns_config` = `true`): Provide the `zone_name` of your Cloud DNS zone. The module automatically creates all required DNS records, including those for TLS certificate verification.
 
 TLS certificate verification may take some time.
-
