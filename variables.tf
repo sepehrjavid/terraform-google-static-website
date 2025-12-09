@@ -45,10 +45,6 @@ variable "lb" {
     })))
   })
   default = {}
-  # validation {
-  #   condition     = var.lb.extra_backends == null || length(setsubtract(var.branches, keys(var.lb.extra_backends))) == 0
-  #   error_message = "When lb.extra_backends is defined, each branch in var.branches must have a corresponding key in lb.extra_backends."
-  # }
 }
 
 variable "name_prefix" {
