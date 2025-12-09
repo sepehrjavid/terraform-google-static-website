@@ -82,6 +82,23 @@ resource "google_compute_url_map" "default" {
       name            = "${path_matcher.value}-matcher"
       default_service = google_compute_backend_bucket.backends[path_matcher.value].id
 
+      dynamic "path_rule" {
+        for_each = try({ extra_backend = var.lb.extra_backends[path_matcher.value] }, {})
+        content {
+          paths   = ["/${path_rule.value.url_prefix}/*"]
+          service = path_rule.value.backend_id
+
+          dynamic "route_action" {
+            for_each = path_rule.value.strip_prefix ? [1] : []
+            content {
+              url_rewrite {
+                path_prefix_rewrite = "/"
+              }
+            }
+          }
+        }
+      }
+
       path_rule {
         paths   = ["/*"]
         service = google_compute_backend_bucket.backends[path_matcher.value].id

@@ -35,6 +35,22 @@ variable "cicd" {
   }
 }
 
+variable "lb" {
+  description = "Extra load balancer backends"
+  type = object({
+    extra_backends = optional(map(object({
+      url_prefix   = string
+      backend_id   = string
+      strip_prefix = optional(bool, true)
+    })))
+  })
+  default = {}
+  # validation {
+  #   condition     = var.lb.extra_backends == null || length(setsubtract(var.branches, keys(var.lb.extra_backends))) == 0
+  #   error_message = "When lb.extra_backends is defined, each branch in var.branches must have a corresponding key in lb.extra_backends."
+  # }
+}
+
 variable "name_prefix" {
   description = "Name prefix used to distinguish resources"
   type        = string
