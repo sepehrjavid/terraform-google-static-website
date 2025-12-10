@@ -21,6 +21,7 @@ You can configure the module using the following variables:
 | `name_prefix`         | `string`          | Name prefix used to distinguish resource.                                                      | `null`       | `"my-test"`                                     | 
 | `cicd`         | `object`          | CI/CD config for automated deployments.                                                      | `null`       | See structure below                                       |
 | `enable_cdn`         | `bool`          | Enables Cloud CDN for better performance.                                                     | `true`       | `true`                                       |
+| `lb`         | `object`          | Configuration for extra load balancer backends.                                                      | `{}`       | See structure below.                           |
 | `enable_http_redirect`| `bool`          | Enables HTTP to HTTPS redirection.                                                            | `true`       | `true`                                       |
 | `default_branch_name` | `string`        | The name of the default production branch.                                                   | `"main"`       | `"main"`                                    |
 | `dns_config`         | `object`        | Configuration for DNS settings.                                                              | `null`       | See structure below.                           |
@@ -61,6 +62,21 @@ You can configure the module using the following variables:
 
 **Note: When `github_config` is provided, either `access_token` or `existing_token_secret_version_id` must have a value.**
 
+### Load Balancer Configuration Object Structure
+
+`lb` object consists of the following variables:
+
+| Variable               | Type            | Description                                                                                      | Default       | Example                                      |
+|------------------------|----------------|------------------------------------------------------------------------------------------------|---------------|----------------------------------------------|
+| `extra_backends`            | `map(object)`   |  A map of extra backend services, keyed by branch name.                                                     | `null`       | See below                   |
+
+The `extra_backends` map value is an object with the following attributes:
+
+| Attribute               | Type            | Description                                                                                      | Default       |
+|------------------------|----------------|------------------------------------------------------------------------------------------------|---------------|
+| `url_prefix`            | `string`   |  The URL prefix for which this backend should be used.                                                     | (required)       |
+| `backend_id`       | `string`        |  The ID of the backend service or backend bucket.                                                                 | (required)       |
+| `strip_prefix`         | `bool`          | If true, the `url_prefix` is stripped before forwarding the request to the backend.                                                       | `true`       |
 
 ### DNS Configuration Object Structure
 
@@ -84,11 +100,22 @@ branches = ["main", "develop"]
 
 cicd = {
   enable                = true
+  repo_uri              = "https://github.com/example/app"
   build_config_filename = "mycloudbuild.yaml"
   github_config = {
     access_token                     = "ghp_abcdef1234567890"
     app_installation_id              = "1234567"
     repo_uri                         = "https://github.com/example/app"
+  }
+}
+
+lb = {
+  extra_backends = {
+    main = {
+      url_prefix   = "api"
+      backend_id   = "backend_id"
+      strip_prefix = false
+    }
   }
 }
 
