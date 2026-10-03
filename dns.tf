@@ -1,6 +1,7 @@
 resource "google_dns_record_set" "cert_auth" {
   for_each     = var.dns_config.set_dns_config ? var.branches : []
   name         = google_certificate_manager_dns_authorization.default[each.key].dns_resource_record[0].name
+  project      = var.project_id
   managed_zone = var.dns_config.zone_name
   type         = google_certificate_manager_dns_authorization.default[each.key].dns_resource_record[0].type
   ttl          = 300
@@ -10,6 +11,7 @@ resource "google_dns_record_set" "cert_auth" {
 resource "google_dns_record_set" "website_ip_record" {
   count        = var.dns_config.set_dns_config ? 1 : 0
   name         = "${local.domain_name}."
+  project      = var.project_id
   managed_zone = var.dns_config.zone_name
   type         = "A"
   ttl          = 300
@@ -19,6 +21,7 @@ resource "google_dns_record_set" "website_ip_record" {
 resource "google_dns_record_set" "website_dub_domanins" {
   for_each     = var.dns_config.set_dns_config ? { for branch in var.branches : branch => branch if branch != var.default_branch_name } : {}
   name         = "${each.key}.${local.domain_name}."
+  project      = var.project_id
   managed_zone = var.dns_config.zone_name
   type         = "CNAME"
   ttl          = 300

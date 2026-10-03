@@ -19,6 +19,8 @@ You can configure the module using the following variables:
 |------------------------|----------------|------------------------------------------------------------------------------------------------|---------------|----------------------------------------------|
 | `branches`            | `set(string)`   | Set of branch names that need deployment.                                                     | `null`       | `[ "main", "develop" ]`                   |
 | `name_prefix`         | `string`          | Name prefix used to distinguish resource.                                                      | `null`       | `"my-test"`                                     | 
+| `project_id`          | `string`          | The ID of the GCP project where resources are created.                                         | `null`       | `"my-project"`                                  |
+| `region`              | `string`          | The GCP region for regional resources (buckets, Cloud Build connection, repository and triggers). | `null`       | `"europe-west1"`                                |
 | `cicd`         | `object`          | CI/CD config for automated deployments.                                                      | `null`       | See structure below                                       |
 | `enable_cdn`         | `bool`          | Enables Cloud CDN for better performance.                                                     | `true`       | `true`                                       |
 | `lb`         | `object`          | Configuration for extra load balancer backends.                                                      | `{}`       | See structure below.                           |
@@ -96,6 +98,9 @@ The `extra_backends` map value is an object with the following attributes:
 ### Example Values
 
 ```hcl
+project_id = "my-project"
+region     = "europe-west1"
+
 branches = ["main", "develop"]
 
 cicd = {

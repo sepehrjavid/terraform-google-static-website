@@ -1,6 +1,15 @@
 variable "branches" {
   description = "Set of branch names that need deployment."
   type        = set(string)
+
+  validation {
+    condition     = alltrue([for b in var.branches : can(regex("^[a-z]([a-z0-9-]*[a-z0-9])?$", b))])
+    error_message = "Branch names are used in GCP resource names and DNS labels, so they must contain only lowercase letters, digits and hyphens, start with a letter and not end with a hyphen."
+  }
+  validation {
+    condition     = alltrue([for b in var.branches : length("${var.name_prefix}-${b}-website-bucket") <= 63])
+    error_message = "name_prefix and branch name are too long: bucket name \"<name_prefix>-<branch>-website-bucket\" must be at most 63 characters."
+  }
 }
 
 variable "cicd" {
@@ -30,8 +39,16 @@ variable "cicd" {
     error_message = "When github_config is provided, either access_token or existing_token_secret_version_id must have a value."
   }
   validation {
+    condition     = try(var.cicd.github_config.existing_token_secret_version_id, null) == null || can(regex("^projects/[^/]+/secrets/[^/]+/versions/[^/]+$", var.cicd.github_config.existing_token_secret_version_id))
+    error_message = "existing_token_secret_version_id must be in the format projects/{project}/secrets/{secret}/versions/{version}."
+  }
+  validation {
     condition     = !var.cicd.enable || var.cicd.build_sa_ids == null || length(setsubtract(var.branches, keys(var.cicd.build_sa_ids))) == 0
     error_message = "When cicd.enable is true, each branch in var.branches must have a corresponding key in cicd.build_sa_ids."
+  }
+  validation {
+    condition     = !var.cicd.enable || var.cicd.build_sa_ids != null || alltrue([for b in var.branches : length("${var.name_prefix}-${b}-build") <= 30])
+    error_message = "name_prefix and branch name are too long: service account ID \"<name_prefix>-<branch>-build\" must be at most 30 characters. Shorten them or provide cicd.build_sa_ids."
   }
 }
 
@@ -52,6 +69,16 @@ variable "name_prefix" {
   type        = string
 }
 
+variable "project_id" {
+  description = "The ID of the GCP project where resources are created."
+  type        = string
+}
+
+variable "region" {
+  description = "The GCP region for regional resources (buckets, Cloud Build connection, repository and triggers)."
+  type        = string
+}
+
 variable "enable_cdn" {
   description = "Enables Cloud CDN for better performance."
   type        = bool
@@ -68,6 +95,11 @@ variable "default_branch_name" {
   description = "The name of the default production branch."
   type        = string
   default     = "main"
+
+  validation {
+    condition     = contains(var.branches, var.default_branch_name)
+    error_message = "default_branch_name (\"${var.default_branch_name}\") must be one of the branches in var.branches."
+  }
 }
 
 variable "dns_config" {
