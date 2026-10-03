@@ -9,13 +9,17 @@ permissions:
 
 jobs:
   validate:
-    name: Validate (Terraform ${{ matrix.terraform }})
+    # Job names are stable so they can be required status checks.
+    name: Validate (Terraform ${{ matrix.label }})
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        # Minimum version from required_version, and the latest release.
-        terraform: ["1.13.5", "latest"]
+        include:
+          - label: minimum # keep in line with required_version
+            terraform: "1.13.5"
+          - label: latest
+            terraform: "latest"
     steps:
       - uses: actions/checkout@v7
 
