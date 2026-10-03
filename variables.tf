@@ -117,6 +117,6 @@ variable "dns_config" {
 
   validation {
     condition     = var.dns_config.domain_name != null || var.dns_config.zone_name != null
-    error_message = "Either domain_name or set_dns_config must be specified"
+    error_message = "Either domain_name or zone_name must be specified."
   }
 }
