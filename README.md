@@ -15,7 +15,7 @@ The module enables the Certificate Manager API, and the Cloud Build and Secret M
 
 ## Requirements
 
-- Terraform `>= 1.10` and the `hashicorp/google` provider `>= 6.17`.
+- Terraform `>= 1.13` and the `hashicorp/google` provider `>= 7.0`.
 - These APIs enabled on the project:
   - Compute Engine (`compute.googleapis.com`)
   - IAM (`iam.googleapis.com`), when the module creates the build service accounts
