@@ -38,9 +38,10 @@ resource "google_secret_manager_secret" "github_token_secret" {
 }
 
 resource "google_secret_manager_secret_version" "github_token_secret_version" {
-  count       = local.create_secret ? 1 : 0
-  secret      = google_secret_manager_secret.github_token_secret[0].id
-  secret_data = local.github_access_token
+  count                  = local.create_secret ? 1 : 0
+  secret                 = google_secret_manager_secret.github_token_secret[0].id
+  secret_data_wo         = local.github_access_token
+  secret_data_wo_version = var.cicd.github_config.access_token_version
 }
 
 resource "google_secret_manager_secret_iam_member" "cloudbuild_token_accessor" {

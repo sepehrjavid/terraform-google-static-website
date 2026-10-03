@@ -101,10 +101,11 @@ Branch names are used in resource names and DNS labels, so:
 | Name | Type | Default | Description |
 |------|------|---------|-------------|
 | `app_installation_id` | `string` | required | Installation ID of the Cloud Build GitHub App: the number at the end of the app's configuration page URL, e.g. `https://github.com/settings/installations/12345678`. |
-| `access_token` | `string` | `null` | GitHub personal access token. The module stores it in Secret Manager as `<name_prefix>-github-access-token`. |
+| `access_token` | `string` | `null` | GitHub personal access token. The module stores it in Secret Manager as `<name_prefix>-github-access-token`. It's passed as a write-only argument, so it isn't saved in the Terraform state. |
+| `access_token_version` | `number` | `1` | Increase this to store a new `access_token` in Secret Manager. Because the token is write-only, Terraform can't detect a changed token on its own. |
 | `existing_token_secret_version_id` | `string` | `null` | A token already stored in Secret Manager, as `projects/{project}/secrets/{secret}/versions/{version}`. |
 
-Set either `access_token` or `existing_token_secret_version_id`; if both are set, the existing secret is used. In both cases the module grants the Cloud Build service agent `roles/secretmanager.secretAccessor` on the secret. A value passed in `access_token` is stored in the Terraform state, so prefer `existing_token_secret_version_id` if that's a concern.
+Set either `access_token` or `existing_token_secret_version_id`; if both are set, the existing secret is used. In both cases the module grants the Cloud Build service agent `roles/secretmanager.secretAccessor` on the secret.
 
 #### Build config
 

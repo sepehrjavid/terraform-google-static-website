@@ -22,6 +22,7 @@ variable "cicd" {
     build_sa_ids          = optional(map(string), null)
     github_config = optional(object({
       access_token                     = optional(string, null)
+      access_token_version             = optional(number, 1)
       existing_token_secret_version_id = optional(string, null)
       app_installation_id              = string
     }), null)
