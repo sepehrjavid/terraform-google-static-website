@@ -2,6 +2,10 @@
 # dot), CI/CD with a token the module stores and build SAs it creates, CDN and
 # HTTP redirect off.
 
+terraform {
+  backend "gcs" {}
+}
+
 variable "project_id" {
   type = string
 }
@@ -12,6 +16,10 @@ variable "region" {
 
 variable "name_prefix" {
   type = string
+}
+
+locals {
+  name_prefix = "${var.name_prefix}zc"
 }
 
 variable "github_token" {
@@ -28,7 +36,7 @@ module "website" {
 
   project_id  = var.project_id
   region      = var.region
-  name_prefix = var.name_prefix
+  name_prefix = local.name_prefix
 
   # No pushes happen to this branch, so the trigger never runs a build.
   branches             = ["e2e"]

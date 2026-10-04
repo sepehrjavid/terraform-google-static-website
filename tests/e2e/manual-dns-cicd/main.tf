@@ -1,6 +1,10 @@
 # No Cloud DNS zone, CI/CD with a token already in Secret Manager and build SAs
 # passed in through build_sa_ids.
 
+terraform {
+  backend "gcs" {}
+}
+
 variable "project_id" {
   type = string
 }
@@ -11,6 +15,10 @@ variable "region" {
 
 variable "name_prefix" {
   type = string
+}
+
+locals {
+  name_prefix = "${var.name_prefix}mc"
 }
 
 variable "github_token" {
@@ -24,7 +32,7 @@ variable "app_installation_id" {
 
 resource "google_secret_manager_secret" "token" {
   project   = var.project_id
-  secret_id = "${var.name_prefix}-token"
+  secret_id = "${local.name_prefix}-token"
 
   replication {
     auto {}
@@ -39,7 +47,7 @@ resource "google_secret_manager_secret_version" "token" {
 
 resource "google_service_account" "build" {
   project    = var.project_id
-  account_id = "${var.name_prefix}-own-build"
+  account_id = "${local.name_prefix}-own-build"
 }
 
 module "website" {
@@ -47,7 +55,7 @@ module "website" {
 
   project_id  = var.project_id
   region      = var.region
-  name_prefix = var.name_prefix
+  name_prefix = local.name_prefix
 
   # No pushes happen to this branch, so the trigger never runs a build.
   branches            = ["e2e"]

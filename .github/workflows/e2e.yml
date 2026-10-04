@@ -1,7 +1,9 @@
 name: E2E
 
 # Deploys real infrastructure in sepi-dev-static-website-test, checks it and
-# destroys it. Run manually from main before releasing a version.
+# destroys it. Run manually from main before releasing a version. State is kept
+# in GCS so the cleanup job can destroy whatever a failed or cancelled case
+# left behind, and then checks the project is empty.
 on:
   workflow_dispatch:
 
@@ -18,6 +20,10 @@ env:
   TF_VAR_project_id: sepi-dev-static-website-test
   TF_VAR_region: europe-north2
   TF_VAR_app_installation_id: "59933775"
+  TF_VAR_name_prefix: e2e${{ github.run_number }}${{ github.run_attempt }}
+  TF_VAR_github_token: ${{ secrets.E2E_GITHUB_TOKEN }}
+  E2E_STATE_BUCKET: sepi-dev-static-website-test-e2e-state
+  E2E_STATE_PREFIX: ${{ github.run_id }}-${{ github.run_attempt }}
 
 jobs:
   faulty-inputs:
@@ -52,14 +58,7 @@ jobs:
       # (e.g. only 3 backend buckets).
       max-parallel: 1
       matrix:
-        include:
-          - { case: manual-dns, id: m }
-          - { case: manual-dns-cicd, id: mc }
-          - { case: zone, id: z }
-          - { case: zone-cicd, id: zc }
-    env:
-      TF_VAR_name_prefix: e2e${{ github.run_number }}${{ github.run_attempt }}${{ matrix.id }}
-      TF_VAR_github_token: ${{ secrets.E2E_GITHUB_TOKEN }}
+        case: [manual-dns, manual-dns-cicd, zone, zone-cicd]
     defaults:
       run:
         working-directory: tests/e2e/${{ matrix.case }}
@@ -77,8 +76,17 @@ jobs:
         with:
           terraform_wrapper: false
 
+      - name: State bucket
+        run: |
+          gcloud storage buckets describe "gs://$E2E_STATE_BUCKET" >/dev/null 2>&1 ||
+            gcloud storage buckets create "gs://$E2E_STATE_BUCKET" --project "$TF_VAR_project_id" \
+              --location "$TF_VAR_region" --uniform-bucket-level-access
+
       - name: Init
-        run: terraform init -input=false
+        run: |
+          terraform init -input=false \
+            -backend-config="bucket=$E2E_STATE_BUCKET" \
+            -backend-config="prefix=$E2E_STATE_PREFIX/${{ matrix.case }}"
 
       - name: Apply
         run: terraform apply -auto-approve -input=false
@@ -90,3 +98,43 @@ jobs:
       - name: Destroy
         if: always()
         run: terraform destroy -auto-approve -input=false
+
+  cleanup:
+    name: cleanup
+    needs: e2e
+    # Runs even when cases failed or the run was cancelled.
+    if: always() && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: projects/866887811778/locations/global/workloadIdentityPools/default/providers/github-default
+          service_account: sepi-static-website-tester-rw@sepi-prod-iac-core-0.iam.gserviceaccount.com
+
+      - uses: google-github-actions/setup-gcloud@v3
+
+      - uses: hashicorp/setup-terraform@v4
+        with:
+          terraform_wrapper: false
+
+      - name: Destroy what the cases left behind
+        run: |
+          status=0
+          for main in tests/e2e/*/main.tf; do
+            dir=$(dirname "$main")
+            if ! {
+              terraform -chdir="$dir" init -input=false \
+                -backend-config="bucket=$E2E_STATE_BUCKET" \
+                -backend-config="prefix=$E2E_STATE_PREFIX/$(basename "$dir")" &&
+                terraform -chdir="$dir" destroy -auto-approve -input=false
+            }; then
+              status=1
+            fi
+          done
+          exit "$status"
+
+      - name: Check the project is clean
+        if: always()
+        run: tests/e2e/check-clean.sh
