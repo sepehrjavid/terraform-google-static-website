@@ -1,6 +1,10 @@
 # Existing Cloud DNS zone (lab.sepehrjavid.com), two branches, an extra
 # backend under /api, CDN and HTTP redirect on, no CI/CD.
 
+terraform {
+  backend "gcs" {}
+}
+
 variable "project_id" {
   type = string
 }
@@ -13,9 +17,13 @@ variable "name_prefix" {
   type = string
 }
 
+locals {
+  name_prefix = "${var.name_prefix}z"
+}
+
 resource "google_storage_bucket" "api" {
   project                     = var.project_id
-  name                        = "${var.name_prefix}-api-website-bucket"
+  name                        = "${local.name_prefix}-api-website-bucket"
   location                    = var.region
   force_destroy               = true
   uniform_bucket_level_access = true
@@ -33,7 +41,7 @@ resource "google_storage_bucket_iam_member" "api_public" {
 
 resource "google_compute_backend_bucket" "api" {
   project     = var.project_id
-  name        = "${var.name_prefix}-api-backend"
+  name        = "${local.name_prefix}-api-backend"
   bucket_name = google_storage_bucket.api.name
 }
 
@@ -42,7 +50,7 @@ module "website" {
 
   project_id  = var.project_id
   region      = var.region
-  name_prefix = var.name_prefix
+  name_prefix = local.name_prefix
   branches    = ["main", "dev"]
   cicd        = { enable = false }
 

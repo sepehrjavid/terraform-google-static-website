@@ -1,6 +1,10 @@
 # No Cloud DNS zone (lab2.sepehrjavid.com isn't delegated): the module only
 # outputs the records to create. Two branches, no CI/CD.
 
+terraform {
+  backend "gcs" {}
+}
+
 variable "project_id" {
   type = string
 }
@@ -13,12 +17,16 @@ variable "name_prefix" {
   type = string
 }
 
+locals {
+  name_prefix = "${var.name_prefix}m"
+}
+
 module "website" {
   source = "../../.."
 
   project_id  = var.project_id
   region      = var.region
-  name_prefix = var.name_prefix
+  name_prefix = local.name_prefix
   branches    = ["main", "dev"]
   cicd        = { enable = false }
 
