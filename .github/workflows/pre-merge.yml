@@ -37,9 +37,13 @@ jobs:
       - name: Validate
         run: terraform validate
 
+      - name: Test
+        run: terraform test
+
       - name: Validate e2e tests
         run: |
-          for dir in tests/e2e/*/; do
+          for main in tests/e2e/*/main.tf; do
+            dir=$(dirname "$main")
             terraform -chdir="$dir" init -backend=false -input=false
             terraform -chdir="$dir" validate
           done
