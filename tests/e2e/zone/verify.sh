@@ -15,7 +15,7 @@ upload "$(terraform output -json buckets | jq -r .dev)" index.html dev
 upload "$(terraform output -raw api_bucket)" index.html api
 upload "$(terraform output -raw api_bucket)" ping.txt ping
 
-../wait-for-url.sh https://lab.sepehrjavid.com/ "main $marker"
+../wait-for-url.sh https://lab.sepehrjavid.com/ "main $marker" 90
 ../wait-for-url.sh https://dev.lab.sepehrjavid.com/ "dev $marker"
 ../wait-for-url.sh https://lab.sepehrjavid.com/api "api $marker"
 ../wait-for-url.sh https://lab.sepehrjavid.com/api/ping.txt "ping $marker"

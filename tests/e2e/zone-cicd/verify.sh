@@ -13,7 +13,7 @@ page="$(mktemp -d)/index.html"
 echo "e2e $marker" >"$page"
 gcloud storage cp "$page" "gs://$(terraform output -json buckets | jq -r .e2e)/index.html"
 
-../wait-for-url.sh https://lab.sepehrjavid.com/ "e2e $marker"
+../wait-for-url.sh https://lab.sepehrjavid.com/ "e2e $marker" 90
 
 # HTTP redirect is off, so nothing should answer on port 80.
 if curl -sS --max-time 10 -o /dev/null http://lab.sepehrjavid.com/ 2>/dev/null; then

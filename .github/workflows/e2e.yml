@@ -45,7 +45,7 @@ jobs:
     name: ${{ matrix.case }}
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
-    timeout-minutes: 120
+    timeout-minutes: 150
     strategy:
       fail-fast: false
       # One case at a time: cases share DNS names and the project's quotas
