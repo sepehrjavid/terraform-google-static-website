@@ -36,8 +36,8 @@ variable "cicd" {
     error_message = "Either github_config or existing_gh_conn_name must be provided when cicd.enable is set to true."
   }
   validation {
-    condition     = var.cicd.github_config == null || try(var.cicd.github_config.access_token, null) != null || try(var.cicd.github_config.existing_token_secret_version_id, null) != null
-    error_message = "When github_config is provided, either access_token or existing_token_secret_version_id must have a value."
+    condition     = var.cicd.github_config == null || (try(var.cicd.github_config.access_token, null) != null) != (try(var.cicd.github_config.existing_token_secret_version_id, null) != null)
+    error_message = "When github_config is provided, set exactly one of access_token or existing_token_secret_version_id."
   }
   validation {
     condition     = try(var.cicd.github_config.existing_token_secret_version_id, null) == null || can(regex("^projects/[^/]+/secrets/[^/]+/versions/[^/]+$", var.cicd.github_config.existing_token_secret_version_id))

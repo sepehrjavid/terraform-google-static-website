@@ -2,7 +2,7 @@ locals {
   gh_token_secret_version_id = try(var.cicd.github_config.existing_token_secret_version_id, null)
   github_access_token        = try(sensitive(var.cicd.github_config.access_token), null)
   create_gh_connection       = var.cicd.enable && var.cicd.existing_gh_conn_name == null
-  create_secret              = local.create_gh_connection && local.gh_token_secret_version_id == null
+  create_secret              = local.create_gh_connection && try(var.cicd.github_config.access_token, null) != null
   secret_version_id_regex    = "^projects/([^/]+)/secrets/([^/]+)/versions/[^/]+$"
 }
 

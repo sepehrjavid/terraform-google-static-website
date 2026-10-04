@@ -105,7 +105,7 @@ Branch names are used in resource names and DNS labels, so:
 | `access_token_version` | `number` | `1` | Increase this to store a new `access_token` in Secret Manager. Because the token is write-only, Terraform can't detect a changed token on its own. |
 | `existing_token_secret_version_id` | `string` | `null` | A token already stored in Secret Manager, as `projects/{project}/secrets/{secret}/versions/{version}`. |
 
-Set either `access_token` or `existing_token_secret_version_id`; if both are set, the existing secret is used. In both cases the module grants the Cloud Build service agent `roles/secretmanager.secretAccessor` on the secret.
+Set exactly one of `access_token` or `existing_token_secret_version_id`. In both cases the module grants the Cloud Build service agent `roles/secretmanager.secretAccessor` on the secret.
 
 #### Build config
 
