@@ -27,6 +27,6 @@ module "website" {
   }
 }
 
-output "dns_auth_creds" {
-  value = module.website.dns_auth_creds
+output "lb_ip" {
+  value = module.website.lb_ip
 }

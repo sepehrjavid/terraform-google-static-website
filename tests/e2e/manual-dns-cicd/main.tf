@@ -66,3 +66,7 @@ module "website" {
     domain_name = "lab2.sepehrjavid.com"
   }
 }
+
+output "lb_ip" {
+  value = module.website.lb_ip
+}

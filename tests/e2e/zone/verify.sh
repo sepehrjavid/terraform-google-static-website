@@ -20,9 +20,4 @@ upload "$(terraform output -raw api_bucket)" ping.txt ping
 ../wait-for-url.sh https://lab.sepehrjavid.com/api "api $marker"
 ../wait-for-url.sh https://lab.sepehrjavid.com/api/ping.txt "ping $marker"
 
-redirect=$(curl -sS --max-time 10 -o /dev/null -w '%{http_code} %{redirect_url}' http://lab.sepehrjavid.com/)
-if [[ $redirect != "301 https://lab.sepehrjavid.com/" ]]; then
-  echo "Expected HTTP to redirect to HTTPS, got: $redirect" >&2
-  exit 1
-fi
-echo "OK http://lab.sepehrjavid.com/ redirects to HTTPS"
+../wait-for-redirect.sh http://lab.sepehrjavid.com/ https://lab.sepehrjavid.com/
