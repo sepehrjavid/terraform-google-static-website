@@ -1,0 +1,72 @@
+name: E2E
+
+# Deploys real infrastructure in sepi-dev-static-website-test, checks it and
+# destroys it. Run manually from main before releasing a version.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: e2e
+  cancel-in-progress: false
+
+env:
+  TF_IN_AUTOMATION: "true"
+  TF_VAR_project_id: sepi-dev-static-website-test
+  TF_VAR_region: europe-north2
+  TF_VAR_app_installation_id: "59933775"
+
+jobs:
+  e2e:
+    name: ${{ matrix.case }}
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    # Cases that share a domain would create the same DNS records.
+    concurrency:
+      group: e2e-${{ matrix.domain }}
+      cancel-in-progress: false
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { case: zone, id: z, domain: lab }
+          - { case: zone-cicd, id: zc, domain: lab }
+          - { case: manual-dns, id: m, domain: lab2 }
+          - { case: manual-dns-cicd, id: mc, domain: lab2 }
+    env:
+      TF_VAR_name_prefix: e2e${{ github.run_number }}${{ github.run_attempt }}${{ matrix.id }}
+      TF_VAR_github_token: ${{ secrets.E2E_GITHUB_TOKEN }}
+    defaults:
+      run:
+        working-directory: tests/e2e/${{ matrix.case }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: projects/866887811778/locations/global/workloadIdentityPools/default/providers/github-default
+          service_account: sepi-static-website-tester-rw@sepi-prod-iac-core-0.iam.gserviceaccount.com
+
+      - uses: google-github-actions/setup-gcloud@v3
+
+      - uses: hashicorp/setup-terraform@v4
+        with:
+          terraform_wrapper: false
+
+      - name: Init
+        run: terraform init -input=false
+
+      - name: Apply
+        run: terraform apply -auto-approve -input=false
+
+      - name: Verify
+        if: hashFiles(format('tests/e2e/{0}/verify.sh', matrix.case)) != ''
+        run: ./verify.sh
+
+      - name: Destroy
+        if: always()
+        run: terraform destroy -auto-approve -input=false
