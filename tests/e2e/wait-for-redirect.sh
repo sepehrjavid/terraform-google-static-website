@@ -14,7 +14,14 @@ if [[ -n $host ]]; then
   args+=(-H "Host: $host")
 fi
 
-until [[ "$(curl "${args[@]}" "$url" 2>/dev/null)" == "301 $location" ]]; do
+redirects() {
+  local result
+  result=$(curl "${args[@]}" "$url" 2>/dev/null) || true
+  # Google's load balancer redirects to https://host:443/, so drop the port.
+  [[ ${result/:443\//\/} == "301 $location" ]]
+}
+
+until redirects; do
   if (($(date +%s) >= deadline)); then
     echo "Timed out waiting for $url (Host: ${host:-default}) to redirect to $location" >&2
     curl -sS -i --max-time 10 ${host:+-H "Host: $host"} "$url" >&2 || true
