@@ -46,18 +46,17 @@ jobs:
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 120
-    # Cases that share a domain would create the same DNS records.
-    concurrency:
-      group: e2e-${{ matrix.domain }}
-      cancel-in-progress: false
     strategy:
       fail-fast: false
+      # One case at a time: cases share DNS names and the project's quotas
+      # (e.g. only 3 backend buckets).
+      max-parallel: 1
       matrix:
         include:
-          - { case: zone, id: z, domain: lab }
-          - { case: zone-cicd, id: zc, domain: lab }
-          - { case: manual-dns, id: m, domain: lab2 }
-          - { case: manual-dns-cicd, id: mc, domain: lab2 }
+          - { case: manual-dns, id: m }
+          - { case: manual-dns-cicd, id: mc }
+          - { case: zone, id: z }
+          - { case: zone-cicd, id: zc }
     env:
       TF_VAR_name_prefix: e2e${{ github.run_number }}${{ github.run_attempt }}${{ matrix.id }}
       TF_VAR_github_token: ${{ secrets.E2E_GITHUB_TOKEN }}
