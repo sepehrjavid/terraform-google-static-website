@@ -1,0 +1,49 @@
+name: Pre-merge
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    # Job names are stable so they can be required status checks.
+    name: Validate (Terraform ${{ matrix.label }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - label: minimum # keep in line with required_version
+            terraform: "1.13.5"
+          - label: latest
+            terraform: "latest"
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: hashicorp/setup-terraform@v4
+        with:
+          terraform_version: ${{ matrix.terraform }}
+          terraform_wrapper: false
+
+      - name: Format
+        run: terraform fmt -check -recursive -diff
+
+      - name: Init
+        run: terraform init -backend=false -input=false
+
+      - name: Validate
+        run: terraform validate
+
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: terraform-linters/setup-tflint@v6
+
+      - name: TFLint
+        run: tflint --format compact

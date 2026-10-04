@@ -3,6 +3,7 @@
 ###########################
 
 resource "google_project_service" "cert_manager_api" {
+  project = var.project_id
   service = "certificatemanager.googleapis.com"
 
   timeouts {
@@ -22,13 +23,15 @@ resource "time_sleep" "wait_30_seconds_cert" {
 
 resource "google_certificate_manager_dns_authorization" "default" {
   for_each   = var.branches
+  project    = var.project_id
   name       = "${var.name_prefix}-${each.key}-dns-auth"
   domain     = each.key == var.default_branch_name ? local.domain_name : "${each.key}.${local.domain_name}"
   depends_on = [time_sleep.wait_30_seconds_cert]
 }
 
 resource "google_certificate_manager_certificate" "default" {
-  name = "${var.name_prefix}-website-cert"
+  project = var.project_id
+  name    = "${var.name_prefix}-website-cert"
 
   managed {
     domains            = [for auth in google_certificate_manager_dns_authorization.default : auth.domain]
@@ -37,11 +40,13 @@ resource "google_certificate_manager_certificate" "default" {
 }
 
 resource "google_certificate_manager_certificate_map" "default" {
+  project    = var.project_id
   name       = "${var.name_prefix}-website-cert-map"
   depends_on = [time_sleep.wait_30_seconds_cert]
 }
 
 resource "google_certificate_manager_certificate_map_entry" "default" {
+  project      = var.project_id
   name         = "${var.name_prefix}-cert-map-entry"
   matcher      = "PRIMARY"
   map          = google_certificate_manager_certificate_map.default.name
@@ -53,18 +58,21 @@ resource "google_certificate_manager_certificate_map_entry" "default" {
 #####################
 
 resource "google_compute_global_address" "default" {
-  name = "${var.name_prefix}-website-ip"
+  project = var.project_id
+  name    = "${var.name_prefix}-website-ip"
 }
 
 resource "google_compute_backend_bucket" "backends" {
   for_each    = var.branches
+  project     = var.project_id
   name        = "${var.name_prefix}-${each.key}-backend"
   bucket_name = google_storage_bucket.website_bucket[each.key].name
   enable_cdn  = var.enable_cdn
 }
 
 resource "google_compute_url_map" "default" {
-  name = "${var.name_prefix}-https-lb"
+  project = var.project_id
+  name    = "${var.name_prefix}-https-lb"
 
   default_service = google_compute_backend_bucket.backends[var.default_branch_name].id
 
@@ -85,7 +93,7 @@ resource "google_compute_url_map" "default" {
       dynamic "path_rule" {
         for_each = try({ extra_backend = var.lb.extra_backends[path_matcher.value] }, {})
         content {
-          paths   = ["/${path_rule.value.url_prefix}/*"]
+          paths   = ["/${path_rule.value.url_prefix}", "/${path_rule.value.url_prefix}/*"]
           service = path_rule.value.backend_id
 
           dynamic "route_action" {
@@ -108,12 +116,14 @@ resource "google_compute_url_map" "default" {
 }
 
 resource "google_compute_target_https_proxy" "default" {
+  project         = var.project_id
   name            = "${var.name_prefix}-https-lb-proxy"
   url_map         = google_compute_url_map.default.id
   certificate_map = "//certificatemanager.googleapis.com/${google_certificate_manager_certificate_map.default.id}"
 }
 
 resource "google_compute_global_forwarding_rule" "default" {
+  project               = var.project_id
   name                  = "${var.name_prefix}-https-lb-forwarding-rule"
   ip_protocol           = "TCP"
   load_balancing_scheme = "EXTERNAL_MANAGED"
@@ -127,8 +137,9 @@ resource "google_compute_global_forwarding_rule" "default" {
 ##############################
 
 resource "google_compute_url_map" "http_redirect_url_map" {
-  count = var.enable_http_redirect ? 1 : 0
-  name  = "${var.name_prefix}-http-redirect-lb"
+  count   = var.enable_http_redirect ? 1 : 0
+  project = var.project_id
+  name    = "${var.name_prefix}-http-redirect-lb"
 
   default_url_redirect {
     https_redirect         = true
@@ -139,12 +150,14 @@ resource "google_compute_url_map" "http_redirect_url_map" {
 
 resource "google_compute_target_http_proxy" "http_redirect_proxy" {
   count   = var.enable_http_redirect ? 1 : 0
+  project = var.project_id
   name    = "${var.name_prefix}-https-redirect-proxy"
   url_map = google_compute_url_map.http_redirect_url_map[0].id
 }
 
 resource "google_compute_global_forwarding_rule" "http_forwarding_rule" {
   count                 = var.enable_http_redirect ? 1 : 0
+  project               = var.project_id
   name                  = "${var.name_prefix}-http-redirect-forwarding-rule"
   load_balancing_scheme = "EXTERNAL_MANAGED"
   target                = google_compute_target_http_proxy.http_redirect_proxy[0].id

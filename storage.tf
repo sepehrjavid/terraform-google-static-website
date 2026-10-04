@@ -1,7 +1,8 @@
 resource "google_storage_bucket" "website_bucket" {
   for_each                    = var.branches
+  project                     = var.project_id
   name                        = "${var.name_prefix}-${each.value}-website-bucket"
-  location                    = data.google_client_config.client_config.region
+  location                    = var.region
   storage_class               = "STANDARD"
   force_destroy               = true
   uniform_bucket_level_access = true
