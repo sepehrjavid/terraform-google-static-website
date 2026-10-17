@@ -161,3 +161,117 @@ run "build_sa_ids_missing_a_branch_rejected" {
   }
   expect_failures = [var.cicd]
 }
+
+run "cdn_invalidator_role" {
+  command = plan
+  variables {
+    name_prefix = "my-site"
+    cicd        = { repo_uri = "https://github.com/a/b.git", existing_gh_conn_name = "c" }
+  }
+  override_resource {
+    target          = random_id.cdn_invalidator_role
+    override_during = plan
+    values          = { hex = "0a1b2c3d" }
+  }
+  assert {
+    condition     = google_project_iam_custom_role.cdn_invalidator[0].role_id == "my_site_cdn_invalidator_0a1b2c3d"
+    error_message = "Role ID should be name_prefix with underscores for hyphens, plus the random suffix."
+  }
+  assert {
+    condition     = can(regex("^[a-zA-Z0-9_.]{3,64}$", google_project_iam_custom_role.cdn_invalidator[0].role_id))
+    error_message = "Role ID doesn't match the format IAM accepts."
+  }
+  assert {
+    condition     = google_project_iam_custom_role.cdn_invalidator[0].permissions == toset(["compute.urlMaps.invalidateCache"])
+    error_message = "The role should only allow invalidating the CDN cache."
+  }
+}
+
+run "cdn_invalidator_granted_to_each_build_sa" {
+  command = plan
+  variables {
+    branches = ["main", "dev"]
+    cicd     = { repo_uri = "https://github.com/a/b.git", existing_gh_conn_name = "c" }
+  }
+  override_resource {
+    target          = google_project_iam_custom_role.cdn_invalidator
+    override_during = plan
+    values          = { id = "projects/p/roles/x_cdn_invalidator_0a1b2c3d" }
+  }
+  override_resource {
+    target          = google_service_account.website_build_sa["main"]
+    override_during = plan
+    values          = { email = "x-main-build@p.iam.gserviceaccount.com" }
+  }
+  override_resource {
+    target          = google_service_account.website_build_sa["dev"]
+    override_during = plan
+    values          = { email = "x-dev-build@p.iam.gserviceaccount.com" }
+  }
+  assert {
+    condition     = length(google_project_iam_custom_role.cdn_invalidator) == 1
+    error_message = "All branches should share one role."
+  }
+  assert {
+    condition = (
+      length(google_project_iam_member.build_sa_cdn_invalidator) == 2 &&
+      google_project_iam_member.build_sa_cdn_invalidator["main"].member == "serviceAccount:x-main-build@p.iam.gserviceaccount.com" &&
+      google_project_iam_member.build_sa_cdn_invalidator["dev"].member == "serviceAccount:x-dev-build@p.iam.gserviceaccount.com"
+    )
+    error_message = "Each branch's build SA should get the role."
+  }
+  assert {
+    condition     = alltrue([for g in google_project_iam_member.build_sa_cdn_invalidator : g.project == "p" && g.role == "projects/p/roles/x_cdn_invalidator_0a1b2c3d"])
+    error_message = "The custom role should be granted on the project."
+  }
+}
+
+run "no_cdn_invalidator_without_cdn" {
+  command = plan
+  variables {
+    enable_cdn = false
+    cicd       = { repo_uri = "https://github.com/a/b.git", existing_gh_conn_name = "c" }
+  }
+  assert {
+    condition     = length(google_project_iam_custom_role.cdn_invalidator) == 0 && length(google_project_iam_member.build_sa_cdn_invalidator) == 0
+    error_message = "Nothing to invalidate without CDN."
+  }
+}
+
+run "no_cdn_invalidator_with_own_build_sas" {
+  command = plan
+  variables {
+    cicd = {
+      repo_uri              = "https://github.com/a/b.git"
+      existing_gh_conn_name = "c"
+      build_sa_ids          = { main = "projects/p/serviceAccounts/a@p.iam.gserviceaccount.com" }
+    }
+  }
+  assert {
+    condition     = length(google_project_iam_custom_role.cdn_invalidator) == 0 && length(google_project_iam_member.build_sa_cdn_invalidator) == 0
+    error_message = "No roles should be granted to build SAs passed in."
+  }
+}
+
+run "no_cdn_invalidator_without_cicd" {
+  command = plan
+  variables {
+    cicd = { enable = false }
+  }
+  assert {
+    condition     = length(google_project_iam_custom_role.cdn_invalidator) == 0 && length(google_project_iam_member.build_sa_cdn_invalidator) == 0
+    error_message = "No build SAs to grant the role to without CI/CD."
+  }
+}
+
+run "url_map_name_output" {
+  command = plan
+  variables {
+    name_prefix = "my-site"
+    cicd        = { enable = false }
+  }
+  assert {
+    condition     = output.url_map_name == "my-site-https-lb"
+    error_message = "Unexpected URL map name."
+  }
+}

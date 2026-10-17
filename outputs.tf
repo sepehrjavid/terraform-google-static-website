@@ -25,3 +25,8 @@ output "buckets" {
 output "build_sa" {
   value = var.cicd.enable && var.cicd.build_sa_ids == null ? google_service_account.website_build_sa : {}
 }
+
+output "url_map_name" {
+  value       = google_compute_url_map.default.name
+  description = "Name of the HTTPS load balancer's URL map, e.g. for gcloud compute url-maps invalidate-cdn-cache."
+}
