@@ -1,6 +1,6 @@
 # Existing Cloud DNS zone with domain_name set to the zone's DNS name (trailing
-# dot), CI/CD with a token the module stores and build SAs it creates, CDN and
-# HTTP redirect off.
+# dot), CI/CD with a token the module stores and build SAs it creates, CDN on
+# (so the build SAs get the cache invalidation role) and HTTP redirect off.
 
 terraform {
   backend "gcs" {}
@@ -41,7 +41,6 @@ module "website" {
   # No pushes happen to this branch, so the trigger never runs a build.
   branches             = ["e2e"]
   default_branch_name  = "e2e"
-  enable_cdn           = false
   enable_http_redirect = false
 
   cicd = {
