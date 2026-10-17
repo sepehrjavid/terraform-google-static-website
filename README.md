@@ -9,7 +9,7 @@ Each branch in `branches` gets its own public Cloud Storage bucket, served throu
 - **Per branch**: a bucket `<name_prefix>-<branch>-website-bucket` (public read, `index.html` as main and not-found page), a backend bucket (with Cloud CDN when `enable_cdn` is `true`) and a Certificate Manager DNS authorization.
 - **Load balancer**: a global external Application Load Balancer (`EXTERNAL_MANAGED`) with a static IP, a Google-managed certificate covering all branch domains and, when `enable_http_redirect` is `true`, an HTTP to HTTPS redirect.
 - **DNS** (when `dns_config.set_dns_config` is `true`): an A record for the domain, a CNAME for each branch subdomain and the certificate validation records.
-- **CI/CD** (when `cicd.enable` is `true`): a Cloud Build GitHub connection (unless you pass an existing one), the linked repository and a push trigger per branch. Unless you pass `build_sa_ids`, each branch gets a build service account `<name_prefix>-<branch>-build` with `roles/storage.objectUser` on its bucket and `roles/logging.logWriter`.
+- **CI/CD** (when `cicd.enable` is `true`): a Cloud Build GitHub connection (unless you pass an existing one), the linked repository and a push trigger per branch. Unless you pass `build_sa_ids`, each branch gets a build service account `<name_prefix>-<branch>-build` with `roles/storage.objectUser` on its bucket, `roles/logging.logWriter` and, when `enable_cdn` is `true`, a custom role that lets it invalidate the CDN cache (see [Build config](#build-config)).
 
 The module enables the Certificate Manager API, and the Cloud Build and Secret Manager APIs when CI/CD is enabled.
 
@@ -110,11 +110,18 @@ Set exactly one of `access_token` or `existing_token_secret_version_id`. In both
 
 #### Build config
 
-Each trigger runs `build_config_filename` from the pushed branch. The build must upload the site to that branch's bucket, `gs://<name_prefix>-<branch>-website-bucket`. The `$BRANCH_NAME` substitution gives the branch, and the `buckets` output lists the names. Triggers run as a user-managed service account, so the build config must also set where logs go (`options.logging`).
+Each trigger runs `build_config_filename` from the pushed branch. The build must upload the site to that branch's bucket, `gs://<name_prefix>-<branch>-website-bucket`. Triggers run as a user-managed service account, so the build config must also set where logs go (`options.logging`).
 
-Cloud Storage serves public objects that have no `Cache-Control` metadata with `public, max-age=3600`, and Cloud CDN caches them for that long. To make a new version live right away, set `Cache-Control` when you upload, then invalidate the cache of the load balancer's URL map (the `url_map_name` output). When `enable_cdn` is `true`, the build service accounts the module creates can do this: they get a custom role, `<name_prefix>_cdn_invalidator_<random suffix>` (hyphens become underscores), with only `compute.urlMaps.invalidateCache`. URL maps don't support IAM on the resource itself, so the role is granted on the project, which lets them invalidate the cache of any URL map in the project.
+Each trigger passes two substitutions to the build:
 
-For the [Usage](#usage) example, with a site that `npm run build` writes to `dist/`:
+- `_WEBSITE_BUCKET`: the name of the branch's bucket (also in the `buckets` output).
+- `_WEBSITE_URL_MAP`: the name of the load balancer's URL map (also the `url_map_name` output).
+
+If your build config defines substitutions with the same names, the trigger's values take precedence. A config that doesn't use them still works, because builds started by a trigger always allow unused substitutions (`ALLOW_LOOSE`).
+
+Cloud Storage serves public objects that have no `Cache-Control` metadata with `public, max-age=3600`, and Cloud CDN caches them for that long. To make a new version live right away, set `Cache-Control` when you upload, then invalidate the URL map's cache. When `enable_cdn` is `true`, the build service accounts the module creates can do this: they get a custom role, `<name_prefix>_cdn_invalidator_<creation timestamp>` (hyphens become underscores), with only `compute.urlMaps.invalidateCache`. URL maps don't support IAM on the resource itself, so the role is granted on the project, which lets them invalidate the cache of any URL map in the project. Google lists `compute.urlMaps.invalidateCache` at the TESTING support level for custom roles (it may behave unexpectedly and isn't recommended for production); the predefined roles that include it, Load Balancer Admin and Network Admin, are much broader.
+
+For a site that `npm run build` writes to `dist/`:
 
 ```yaml
 steps:
@@ -130,22 +137,21 @@ steps:
       - -c
       - |
         set -euo pipefail
-        bucket=gs://my-site-$BRANCH_NAME-website-bucket
         # Fingerprinted files (dist/assets with Vite) never change, so caches can keep them.
-        gcloud storage cp --recursive dist/assets "$$bucket" --cache-control="public, max-age=31536000, immutable"
+        gcloud storage cp --recursive dist/assets gs://$_WEBSITE_BUCKET --cache-control="public, max-age=31536000, immutable"
         # Everything else, HTML included, is revalidated on every request.
         rm -r dist/assets
-        gcloud storage cp --recursive dist/* "$$bucket" --cache-control=no-cache
-        gcloud compute url-maps invalidate-cdn-cache my-site-https-lb --path="/*" --async
+        gcloud storage cp --recursive dist/* gs://$_WEBSITE_BUCKET --cache-control=no-cache
+        gcloud compute url-maps invalidate-cdn-cache $_WEBSITE_URL_MAP --path="/*" --async
 options:
   logging: CLOUD_LOGGING_ONLY
 ```
 
-- `$$` keeps Cloud Build from reading shell variables as substitutions.
+- Cloud Build replaces `$_WEBSITE_BUCKET` and `$_WEBSITE_URL_MAP` before bash runs. A shell variable of your own would need `$$`.
 - Fingerprinted files are uploaded first, so new pages never point to missing files. Files removed from the site stay in the bucket. `gcloud storage rsync --delete-unmatched-destination-objects` would delete them, but syncing to a bucket root needs `storage.buckets.get`, which `roles/storage.objectUser` doesn't include.
 - `--async` returns once the invalidation is accepted. It takes effect in about 10 seconds. Without `--async`, gcloud waits for the operation, which also needs `compute.globalOperations.get` and `compute.urlMaps.get`.
 - The invalidation applies to every branch's domain. Add `--host` to limit it to one.
-- Without CDN, the invalidation step isn't needed, but keep setting `Cache-Control`: browsers cache too.
+- Without CDN, drop the invalidation step (the build service accounts don't get the role then), but keep setting `Cache-Control`: browsers cache too.
 
 ### `lb`
 
