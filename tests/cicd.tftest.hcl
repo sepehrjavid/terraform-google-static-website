@@ -96,18 +96,19 @@ run "branch_trigger_is_anchored" {
   }
 }
 
-run "trigger_passes_bucket_and_url_map" {
+run "trigger_passes_website_substitutions" {
   command = plan
   variables {
     branches = ["main", "dev"]
     cicd     = { repo_uri = "https://github.com/a/b.git", existing_gh_conn_name = "c" }
   }
   assert {
-    condition = alltrue([for b in ["main", "dev"] : google_cloudbuild_trigger.git_trigger[b].substitutions == tomap({
+    condition = alltrue([for b, domain in { main = "example.com", dev = "dev.example.com" } : google_cloudbuild_trigger.git_trigger[b].substitutions == tomap({
       _WEBSITE_BUCKET  = "x-${b}-website-bucket"
       _WEBSITE_URL_MAP = "x-https-lb"
+      _WEBSITE_DOMAIN  = domain
     })])
-    error_message = "Each trigger should pass its branch's bucket and the URL map name."
+    error_message = "Each trigger should pass its branch's bucket and domain, and the URL map name."
   }
 }
 
