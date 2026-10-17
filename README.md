@@ -31,7 +31,8 @@ The module enables the Certificate Manager API, and the Cloud Build and Secret M
 
 ```hcl
 module "website" {
-  source = "github.com/sepehrjavid/terraform-google-static-website"
+  source  = "sepehrjavid/static-website/google"
+  version = "~> 2.0"
 
   project_id  = "my-project"
   region      = "europe-west1"
@@ -235,3 +236,22 @@ There are two ways to set up the records:
   - the certificate validation records from the `dns_auth_creds` output.
 
 The certificate is issued once the validation records resolve, which can take a while. HTTPS requests fail until then.
+
+## Cost
+
+List prices in USD, as of October 2026. For an estimate of your own usage, use the [pricing calculator](https://cloud.google.com/products/calculator).
+
+The fixed cost is the load balancer's forwarding rules: one for HTTPS, plus one for HTTP when `enable_http_redirect` is `true`. [Cloud Load Balancing](https://cloud.google.com/load-balancing/pricing) charges a project $0.025 per hour ($18.25 per month) for its first 5 global forwarding rules, however many of the 5 it uses, and $0.01 per hour ($7.30 per month) for each one after that. So a project with only this module pays $18.25 per month, with or without the redirect, and another instance in the same project adds nothing until the project has more than 5 global forwarding rules. The static IP address is free while it's assigned to a forwarding rule ([IP address pricing](https://cloud.google.com/vpc/network-pricing)).
+
+The rest depends on usage:
+
+- load balancer data processing and internet data transfer ([network pricing](https://cloud.google.com/vpc/network-pricing));
+- [Cloud CDN](https://cloud.google.com/cdn/pricing), when `enable_cdn` is `true`;
+- [Cloud Storage](https://cloud.google.com/storage/pricing) storage and operations;
+- [Cloud DNS](https://cloud.google.com/dns/pricing) zone and queries, when you use a Cloud DNS zone;
+- [Cloud Build](https://cloud.google.com/build/pricing) build minutes beyond the free tier;
+- [Secret Manager](https://cloud.google.com/secret-manager/pricing), for the GitHub token.
+
+[Certificate Manager](https://cloud.google.com/certificate-manager/pricing) is free at this scale: the module deploys one certificate, and a project's first 100 are free.
+
+For a single small site with no per-branch environments, a free static hosting service can be cheaper.
