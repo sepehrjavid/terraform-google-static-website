@@ -20,6 +20,7 @@ The module enables the Certificate Manager API, and the Cloud Build and Secret M
   - Compute Engine (`compute.googleapis.com`)
   - IAM (`iam.googleapis.com`), when the module creates the build service accounts
   - Cloud DNS (`dns.googleapis.com`), when `zone_name` is set
+- When the module creates the build service accounts and `enable_cdn` is `true`, whoever runs Terraform needs permission to manage custom roles in the project, e.g. Role Administrator (`roles/iam.roleAdmin`). Custom roles are managed through the IAM API listed above.
 - The project must allow public buckets: the `storage.publicAccessPrevention` and `iam.allowedPolicyMemberDomains` org policies must not block `allUsers`.
 - A domain you control, at any registrar. For automated DNS, a Cloud DNS zone in `project_id` whose apex is the website domain (see [DNS](#dns)).
 - For CI/CD with a new GitHub connection:
@@ -94,7 +95,7 @@ Branch names are used in resource names and DNS labels, so:
 | `existing_gh_conn_name` | `string` | `null` | Name of an existing Cloud Build GitHub connection in `project_id` and `region`. When set, `github_config` is ignored. |
 | `github_config` | `object` | `null` | Settings for a new GitHub connection. Required when `enable` is `true` and `existing_gh_conn_name` isn't set. |
 | `build_config_filename` | `string` | `"cloudbuild.yaml"` | Path of the Cloud Build config file in the repository. |
-| `build_sa_ids` | `map(string)` | `null` | Your own build service accounts, keyed by branch, as `projects/{project}/serviceAccounts/{email}`. Must have an entry for every branch. When set, the module creates no service accounts and grants no roles, so give them write access to the buckets and permission to write logs yourself. |
+| `build_sa_ids` | `map(string)` | `null` | Your own build service accounts, keyed by branch, as `projects/{project}/serviceAccounts/{email}`. Must have an entry for every branch. When set, the module creates no service accounts and grants no roles, so give them write access to the buckets and permission to write logs yourself. To invalidate the CDN cache, they also need `compute.urlMaps.invalidateCache` on the project. |
 
 #### `github_config`
 
@@ -109,14 +110,42 @@ Set exactly one of `access_token` or `existing_token_secret_version_id`. In both
 
 #### Build config
 
-Each trigger runs `build_config_filename` from the pushed branch. The build must upload the site to that branch's bucket, `gs://<name_prefix>-<branch>-website-bucket`. The `$BRANCH_NAME` substitution gives the branch, and the `buckets` output lists the names.
+Each trigger runs `build_config_filename` from the pushed branch. The build must upload the site to that branch's bucket, `gs://<name_prefix>-<branch>-website-bucket`. The `$BRANCH_NAME` substitution gives the branch, and the `buckets` output lists the names. Triggers run as a user-managed service account, so the build config must also set where logs go (`options.logging`).
 
-Triggers run as a user-managed service account, so the build config must set where logs go, for example:
+Cloud Storage serves public objects that have no `Cache-Control` metadata with `public, max-age=3600`, and Cloud CDN caches them for that long. To make a new version live right away, set `Cache-Control` when you upload, then invalidate the cache of the load balancer's URL map (the `url_map_name` output). When `enable_cdn` is `true`, the build service accounts the module creates can do this: they get a custom role, `<name_prefix>_cdn_invalidator_<random suffix>` (hyphens become underscores), with only `compute.urlMaps.invalidateCache`. URL maps don't support IAM on the resource itself, so the role is granted on the project, which lets them invalidate the cache of any URL map in the project.
+
+For the [Usage](#usage) example, with a site that `npm run build` writes to `dist/`:
 
 ```yaml
+steps:
+  - name: node:24
+    entrypoint: npm
+    args: [ci]
+  - name: node:24
+    entrypoint: npm
+    args: [run, build]
+  - name: gcr.io/google.com/cloudsdktool/google-cloud-cli:stable
+    entrypoint: bash
+    args:
+      - -c
+      - |
+        set -euo pipefail
+        bucket=gs://my-site-$BRANCH_NAME-website-bucket
+        # Fingerprinted files (dist/assets with Vite) never change, so caches can keep them.
+        gcloud storage cp --recursive dist/assets "$$bucket" --cache-control="public, max-age=31536000, immutable"
+        # Everything else, HTML included, is revalidated on every request.
+        rm -r dist/assets
+        gcloud storage cp --recursive dist/* "$$bucket" --cache-control=no-cache
+        gcloud compute url-maps invalidate-cdn-cache my-site-https-lb --path="/*" --async
 options:
   logging: CLOUD_LOGGING_ONLY
 ```
+
+- `$$` keeps Cloud Build from reading shell variables as substitutions.
+- Fingerprinted files are uploaded first, so new pages never point to missing files. Files removed from the site stay in the bucket. `gcloud storage rsync --delete-unmatched-destination-objects` would delete them, but syncing to a bucket root needs `storage.buckets.get`, which `roles/storage.objectUser` doesn't include.
+- `--async` returns once the invalidation is accepted. It takes effect in about 10 seconds. Without `--async`, gcloud waits for the operation, which also needs `compute.globalOperations.get` and `compute.urlMaps.get`.
+- The invalidation applies to every branch's domain. Add `--host` to limit it to one.
+- Without CDN, the invalidation step isn't needed, but keep setting `Cache-Control`: browsers cache too.
 
 ### `lb`
 
@@ -148,6 +177,7 @@ lb = {
 | `buckets` | Bucket name per branch. |
 | `github_connection_name` | Name of the Cloud Build GitHub connection in use. `null` when CI/CD is disabled. |
 | `build_sa` | Build service accounts created by the module, keyed by branch. |
+| `url_map_name` | Name of the HTTPS load balancer's URL map, `<name_prefix>-https-lb`. Pass it to `gcloud compute url-maps invalidate-cdn-cache`. |
 
 ## DNS
 
