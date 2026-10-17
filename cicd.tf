@@ -4,6 +4,7 @@ locals {
   create_gh_connection       = var.cicd.enable && var.cicd.existing_gh_conn_name == null
   create_secret              = local.create_gh_connection && try(var.cicd.github_config.access_token, null) != null
   secret_version_id_regex    = "^projects/([^/]+)/secrets/([^/]+)/versions/[^/]+$"
+  grant_cdn_invalidation     = var.cicd.enable && var.cicd.build_sa_ids == null && var.enable_cdn
 }
 
 resource "google_project_service" "project" {
@@ -103,6 +104,37 @@ resource "google_storage_bucket_iam_member" "build_sa_write_access" {
   for_each = var.cicd.enable && var.cicd.build_sa_ids == null ? var.branches : []
   bucket   = google_storage_bucket.website_bucket[each.key].name
   role     = "roles/storage.objectUser"
+  member   = "serviceAccount:${google_service_account.website_build_sa[each.key].email}"
+}
+
+# A deleted custom role's ID can't be reused for up to 44 days (Terraform can
+# only undelete the role during the first 7), so every new role gets a new
+# suffix. Otherwise destroy and apply with the same name_prefix could fail.
+resource "random_id" "cdn_invalidator_role" {
+  count       = local.grant_cdn_invalidation ? 1 : 0
+  byte_length = 4
+
+  keepers = {
+    project_id  = var.project_id
+    name_prefix = var.name_prefix
+  }
+}
+
+resource "google_project_iam_custom_role" "cdn_invalidator" {
+  count       = local.grant_cdn_invalidation ? 1 : 0
+  project     = var.project_id
+  role_id     = "${replace(var.name_prefix, "-", "_")}_cdn_invalidator_${random_id.cdn_invalidator_role[0].hex}"
+  title       = "${var.name_prefix} CDN cache invalidator"
+  description = "Lets the website build service accounts invalidate the Cloud CDN cache."
+  permissions = ["compute.urlMaps.invalidateCache"]
+}
+
+# URL maps don't have IAM policies of their own, so the role is granted on the
+# project.
+resource "google_project_iam_member" "build_sa_cdn_invalidator" {
+  for_each = local.grant_cdn_invalidation ? google_service_account.website_build_sa : {}
+  project  = var.project_id
+  role     = google_project_iam_custom_role.cdn_invalidator[0].id
   member   = "serviceAccount:${google_service_account.website_build_sa[each.key].email}"
 }
 
