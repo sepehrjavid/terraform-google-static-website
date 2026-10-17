@@ -138,10 +138,11 @@ Set exactly one of `access_token` or `existing_token_secret_version_id`. In both
 
 Each trigger runs `build_config_filename` from the pushed branch. The build must upload the site to that branch's bucket, `gs://<name_prefix>-<branch>-website-bucket`. Triggers run as a user-managed service account, so the build config must also set where logs go (`options.logging`).
 
-Each trigger passes two substitutions to the build:
+Each trigger passes three substitutions to the build:
 
 - `_WEBSITE_BUCKET`: the name of the branch's bucket (also in the `buckets` output).
 - `_WEBSITE_URL_MAP`: the name of the load balancer's URL map (also the `url_map_name` output).
+- `_WEBSITE_DOMAIN`: the branch's domain, e.g. `example.com` for the default branch and `develop.example.com` for `develop`. Use it where the site needs its own absolute URL, such as Hugo's `baseURL`.
 
 If your build config defines substitutions with the same names, the trigger's values take precedence. A config that doesn't use them still works, because builds started by a trigger always allow unused substitutions (`ALLOW_LOOSE`).
 

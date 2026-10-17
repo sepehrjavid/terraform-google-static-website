@@ -155,6 +155,7 @@ resource "google_cloudbuild_trigger" "git_trigger" {
   substitutions = {
     _WEBSITE_BUCKET  = google_storage_bucket.website_bucket[each.key].name
     _WEBSITE_URL_MAP = google_compute_url_map.default.name
+    _WEBSITE_DOMAIN  = each.key == var.default_branch_name ? local.domain_name : "${each.key}.${local.domain_name}"
   }
 
   repository_event_config {
