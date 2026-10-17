@@ -108,13 +108,13 @@ resource "google_storage_bucket_iam_member" "build_sa_write_access" {
 }
 
 # A deleted custom role's ID can't be reused for up to 44 days (Terraform can
-# only undelete the role during the first 7), so every new role gets a new
-# suffix. Otherwise destroy and apply with the same name_prefix could fail.
-resource "random_id" "cdn_invalidator_role" {
-  count       = local.grant_cdn_invalidation ? 1 : 0
-  byte_length = 4
+# only undelete the role during the first 7), so every new role gets its
+# creation time as a suffix. Otherwise destroy and apply with the same
+# name_prefix could fail.
+resource "time_static" "cdn_invalidator_role" {
+  count = local.grant_cdn_invalidation ? 1 : 0
 
-  keepers = {
+  triggers = {
     project_id  = var.project_id
     name_prefix = var.name_prefix
   }
@@ -123,7 +123,7 @@ resource "random_id" "cdn_invalidator_role" {
 resource "google_project_iam_custom_role" "cdn_invalidator" {
   count       = local.grant_cdn_invalidation ? 1 : 0
   project     = var.project_id
-  role_id     = "${replace(var.name_prefix, "-", "_")}_cdn_invalidator_${random_id.cdn_invalidator_role[0].hex}"
+  role_id     = "${replace(var.name_prefix, "-", "_")}_cdn_invalidator_${time_static.cdn_invalidator_role[0].unix}"
   title       = "${var.name_prefix} CDN cache invalidator"
   description = "Lets the website build service accounts invalidate the Cloud CDN cache."
   permissions = ["compute.urlMaps.invalidateCache"]
@@ -145,6 +145,11 @@ resource "google_cloudbuild_trigger" "git_trigger" {
   location        = var.region
   service_account = try(var.cicd.build_sa_ids[each.key], google_service_account.website_build_sa[each.key].id)
   filename        = var.cicd.build_config_filename
+
+  substitutions = {
+    _WEBSITE_BUCKET  = google_storage_bucket.website_bucket[each.key].name
+    _WEBSITE_URL_MAP = google_compute_url_map.default.name
+  }
 
   repository_event_config {
     repository = google_cloudbuildv2_repository.git_repository[0].id

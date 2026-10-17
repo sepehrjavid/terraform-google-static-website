@@ -96,6 +96,21 @@ run "branch_trigger_is_anchored" {
   }
 }
 
+run "trigger_passes_bucket_and_url_map" {
+  command = plan
+  variables {
+    branches = ["main", "dev"]
+    cicd     = { repo_uri = "https://github.com/a/b.git", existing_gh_conn_name = "c" }
+  }
+  assert {
+    condition = alltrue([for b in ["main", "dev"] : google_cloudbuild_trigger.git_trigger[b].substitutions == tomap({
+      _WEBSITE_BUCKET  = "x-${b}-website-bucket"
+      _WEBSITE_URL_MAP = "x-https-lb"
+    })])
+    error_message = "Each trigger should pass its branch's bucket and the URL map name."
+  }
+}
+
 run "missing_repo_uri_rejected" {
   command = plan
   variables {
@@ -169,13 +184,13 @@ run "cdn_invalidator_role" {
     cicd        = { repo_uri = "https://github.com/a/b.git", existing_gh_conn_name = "c" }
   }
   override_resource {
-    target          = random_id.cdn_invalidator_role
+    target          = time_static.cdn_invalidator_role
     override_during = plan
-    values          = { hex = "0a1b2c3d" }
+    values          = { unix = 1760720000 }
   }
   assert {
-    condition     = google_project_iam_custom_role.cdn_invalidator[0].role_id == "my_site_cdn_invalidator_0a1b2c3d"
-    error_message = "Role ID should be name_prefix with underscores for hyphens, plus the random suffix."
+    condition     = google_project_iam_custom_role.cdn_invalidator[0].role_id == "my_site_cdn_invalidator_1760720000"
+    error_message = "Role ID should be name_prefix with underscores for hyphens, plus the creation time."
   }
   assert {
     condition     = can(regex("^[a-zA-Z0-9_.]{3,64}$", google_project_iam_custom_role.cdn_invalidator[0].role_id))
@@ -184,6 +199,29 @@ run "cdn_invalidator_role" {
   assert {
     condition     = google_project_iam_custom_role.cdn_invalidator[0].permissions == toset(["compute.urlMaps.invalidateCache"])
     error_message = "The role should only allow invalidating the CDN cache."
+  }
+}
+
+run "cdn_invalidator_role_id_fits_longest_name_prefix" {
+  command = plan
+  variables {
+    # The longest name_prefix the build SA ID check allows (<name_prefix>-m-build is 30 characters).
+    name_prefix         = "a-twenty-two-char-pref"
+    branches            = ["m"]
+    default_branch_name = "m"
+    cicd                = { repo_uri = "https://github.com/a/b.git", existing_gh_conn_name = "c" }
+  }
+  override_resource {
+    target          = time_static.cdn_invalidator_role
+    override_during = plan
+    values          = { unix = 9999999999 }
+  }
+  assert {
+    condition = (
+      length(google_project_iam_custom_role.cdn_invalidator[0].role_id) == 49 &&
+      can(regex("^[a-zA-Z0-9_.]{3,64}$", google_project_iam_custom_role.cdn_invalidator[0].role_id))
+    )
+    error_message = "Role ID should stay within IAM's 64 characters."
   }
 }
 
