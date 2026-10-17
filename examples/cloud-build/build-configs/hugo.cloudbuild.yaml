@@ -1,0 +1,39 @@
+# Deploys a Hugo site: Hugo writes it to public/, with baseURL set to the
+# branch's own domain, e.g. https://develop.example.com/ for develop.
+#
+# Hugo writes 404.html when the site or its theme has a 404 template. Set
+# not_found_page = "404.html" on the module so missing pages return it.
+steps:
+  # The Hugo image runs as UID 1000, but Cloud Build checks out the source as
+  # root.
+  - name: gcr.io/google.com/cloudsdktool/google-cloud-cli:stable
+    entrypoint: chown
+    args: [-R, "1000:1000", /workspace]
+  # Builds check out the pushed commit without its submodules, and themes are
+  # often one. Skipped when there's no .gitmodules, e.g. with Hugo Modules.
+  - name: ghcr.io/gohugoio/hugo:v0.168.0
+    entrypoint: sh
+    args: [-c, "if [ -f .gitmodules ]; then git submodule update --init --recursive; fi"]
+    # Git, npm and Go need a home directory that UID 1000 can write to.
+    env: [HOME=/tmp]
+  # The official image is the extended edition, with Dart Sass, Node.js and Go
+  # (for Hugo Modules). It runs npm install first when there's a package.json
+  # and no node_modules.
+  - name: ghcr.io/gohugoio/hugo:v0.168.0
+    args: [--minify, --baseURL, "https://$_WEBSITE_DOMAIN/"]
+    env: [HOME=/tmp]
+  - name: gcr.io/google.com/cloudsdktool/google-cloud-cli:stable
+    entrypoint: bash
+    args:
+      - -c
+      - |
+        set -euo pipefail
+        # Hugo has no single directory of fingerprinted files, so everything is revalidated.
+        gcloud storage cp --recursive public/* gs://$_WEBSITE_BUCKET --cache-control=no-cache
+  # Remove this step when enable_cdn = false: there's no CDN cache, and the
+  # build service account doesn't get the permission to invalidate it.
+  - name: gcr.io/google.com/cloudsdktool/google-cloud-cli:stable
+    entrypoint: gcloud
+    args: [compute, url-maps, invalidate-cdn-cache, $_WEBSITE_URL_MAP, --path=/*, --async]
+options:
+  logging: CLOUD_LOGGING_ONLY

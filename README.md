@@ -55,6 +55,11 @@ module "website" {
 
 This serves `main` at `https://example.com` and `develop` at `https://develop.example.com`.
 
+## Examples
+
+- [`examples/basic`](examples/basic): one branch on a domain whose DNS is hosted anywhere, no CI/CD. You create the DNS records and upload the site yourself.
+- [`examples/cloud-build`](examples/cloud-build): a Cloud DNS zone, `main` and `develop`, and Cloud Build deploying each branch on push. It includes build configs for [Vite](examples/cloud-build/build-configs/vite.cloudbuild.yaml), [Hugo](examples/cloud-build/build-configs/hugo.cloudbuild.yaml) and [Next.js](examples/cloud-build/build-configs/nextjs.cloudbuild.yaml).
+
 ## Inputs
 
 | Name | Type | Default | Description |
@@ -147,6 +152,8 @@ Each trigger passes three substitutions to the build:
 If your build config defines substitutions with the same names, the trigger's values take precedence. A config that doesn't use them still works, because builds started by a trigger always allow unused substitutions (`ALLOW_LOOSE`).
 
 Cloud Storage serves public objects that have no `Cache-Control` metadata with `public, max-age=3600`, and Cloud CDN caches them for that long. To make a new version live right away, set `Cache-Control` when you upload, then invalidate the URL map's cache. When `enable_cdn` is `true`, the build service accounts can do this: they get a custom role, `<name_prefix>_cdn_invalidator_<creation timestamp>` (hyphens become underscores), with only `compute.urlMaps.invalidateCache`. URL maps don't support IAM on the resource itself, so the role is granted on the project, which lets them invalidate the cache of any URL map in the project. Google lists `compute.urlMaps.invalidateCache` at the TESTING support level for custom roles (it may behave unexpectedly and isn't recommended for production); the predefined roles that include it, Load Balancer Admin and Network Admin, are much broader.
+
+Complete configs for Vite, Hugo and Next.js are in [`examples/cloud-build/build-configs`](examples/cloud-build/build-configs).
 
 For a site that `npm run build` writes to `dist/`:
 

@@ -48,6 +48,14 @@ jobs:
             terraform -chdir="$dir" validate
           done
 
+      - name: Validate examples
+        run: |
+          for main in examples/*/main.tf; do
+            dir=$(dirname "$main")
+            terraform -chdir="$dir" init -backend=false -input=false
+            terraform -chdir="$dir" validate
+          done
+
   lint:
     name: Lint
     runs-on: ubuntu-latest

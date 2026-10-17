@@ -1,0 +1,28 @@
+# Deploys a Vite site: `npm run build` writes it to dist/, with fingerprinted
+# files in dist/assets/.
+steps:
+  - name: node:24
+    entrypoint: npm
+    args: [ci]
+  - name: node:24
+    entrypoint: npm
+    args: [run, build]
+  - name: gcr.io/google.com/cloudsdktool/google-cloud-cli:stable
+    entrypoint: bash
+    args:
+      - -c
+      - |
+        set -euo pipefail
+        # Fingerprinted files never change, so caches can keep them. They go
+        # first, so new pages never point to missing files.
+        gcloud storage cp --recursive dist/assets gs://$_WEBSITE_BUCKET --cache-control="public, max-age=31536000, immutable"
+        # Everything else, HTML included, is revalidated on every request.
+        rm -r dist/assets
+        gcloud storage cp --recursive dist/* gs://$_WEBSITE_BUCKET --cache-control=no-cache
+  # Remove this step when enable_cdn = false: there's no CDN cache, and the
+  # build service account doesn't get the permission to invalidate it.
+  - name: gcr.io/google.com/cloudsdktool/google-cloud-cli:stable
+    entrypoint: gcloud
+    args: [compute, url-maps, invalidate-cdn-cache, $_WEBSITE_URL_MAP, --path=/*, --async]
+options:
+  logging: CLOUD_LOGGING_ONLY

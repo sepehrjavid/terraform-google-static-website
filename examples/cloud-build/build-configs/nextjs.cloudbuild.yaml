@@ -1,0 +1,46 @@
+# Deploys a Next.js static export. The site's next.config.js needs:
+#
+#   module.exports = {
+#     output: 'export',
+#     trailingSlash: true,
+#     images: { unoptimized: true },
+#   }
+#
+# - output: 'export' makes `next build` write the site to out/, with
+#   fingerprinted files in out/_next/static/.
+# - trailingSlash: true writes /about as about/index.html. Without it, Next.js
+#   writes about.html, but Cloud Storage serves /about only from an object
+#   named about or about/index.html, so /about would return 404.
+# - images.unoptimized: the default next/image loader doesn't work in a static
+#   export. Leave it out if you don't use next/image or you set a custom loader.
+#
+# Next.js writes 404.html. Set not_found_page = "404.html" on the module so
+# missing pages return it.
+steps:
+  - name: node:24
+    entrypoint: npm
+    args: [ci]
+  - name: node:24
+    entrypoint: npm
+    args: [run, build]
+  - name: gcr.io/google.com/cloudsdktool/google-cloud-cli:stable
+    entrypoint: bash
+    args:
+      - -c
+      - |
+        set -euo pipefail
+        # Fingerprinted files never change, so caches can keep them. They go
+        # first, so new pages never point to missing files.
+        gcloud storage cp --recursive out/_next/static gs://$_WEBSITE_BUCKET/_next/ --cache-control="public, max-age=31536000, immutable"
+        # Everything else, HTML included, is revalidated on every request.
+        rm -r out/_next/static
+        # gcloud storage cp fails on empty directories, such as out/_next/<build ID>.
+        find out -type d -empty -delete
+        gcloud storage cp --recursive out/* gs://$_WEBSITE_BUCKET --cache-control=no-cache
+  # Remove this step when enable_cdn = false: there's no CDN cache, and the
+  # build service account doesn't get the permission to invalidate it.
+  - name: gcr.io/google.com/cloudsdktool/google-cloud-cli:stable
+    entrypoint: gcloud
+    args: [compute, url-maps, invalidate-cdn-cache, $_WEBSITE_URL_MAP, --path=/*, --async]
+options:
+  logging: CLOUD_LOGGING_ONLY
