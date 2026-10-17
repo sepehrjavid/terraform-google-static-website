@@ -29,10 +29,12 @@ list "build trigger" gcloud builds triggers list --region "$region"
 list "build connection" gcloud builds connections list --region "$region"
 list "bucket" gcloud storage buckets list
 list "service account" gcloud iam service-accounts list
+list "custom role" gcloud iam roles list # Deleted roles are left out.
 gcloud dns record-sets list --zone lab-sepehrjavid-com --project "$project" --format='value(name,type)' |
   sed 's/^/dns record /' >>"$leftovers"
-gcloud projects get-iam-policy "$project" --format=json |
-  jq -r '.bindings[] | select(.role == "roles/logging.logWriter") | .members[] | "log writer grant \(.)"' >>"$leftovers"
+policy=$(gcloud projects get-iam-policy "$project" --format=json)
+jq -r '.bindings[] | select(.role == "roles/logging.logWriter") | .members[] | "log writer grant \(.)"' <<<"$policy" >>"$leftovers"
+jq -r '.bindings[] | select(.role | startswith("projects/")) | "custom role grant \(.role) \(.members[])"' <<<"$policy" >>"$leftovers"
 
 # Drop the permanent setup.
 grep -vE "^(bucket $state_bucket|service account .*-compute@developer\.gserviceaccount\.com|dns record lab\.sepehrjavid\.com\.\s+(NS|SOA))$" \

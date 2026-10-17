@@ -1,5 +1,5 @@
 # Existing Cloud DNS zone (lab.sepehrjavid.com), two branches, an extra
-# backend under /api, CDN and HTTP redirect on, no CI/CD.
+# backend under /api, CDN off, HTTP redirect on, no CI/CD.
 
 terraform {
   backend "gcs" {}
@@ -53,6 +53,7 @@ module "website" {
   name_prefix = local.name_prefix
   branches    = ["main", "dev"]
   cicd        = { enable = false }
+  enable_cdn  = false
 
   dns_config = {
     set_dns_config = true
