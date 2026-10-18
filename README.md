@@ -70,7 +70,7 @@ This serves `main` at `https://example.com` and `develop` at `https://develop.ex
 | `enable_cdn` | `bool` | `true` | Enable Cloud CDN on the bucket backends. |
 | `enable_http_redirect` | `bool` | `true` | Redirect HTTP (port 80) to HTTPS. |
 | `enable_www_redirect` | `bool` | `false` | Redirect `www.<domain>` to the domain with a 301, keeping the path and query. See [DNS](#dns). |
-| `not_found_page` | `string` | `"index.html"` | Object served with status 404 for paths that have no object, e.g. `"404.html"`. See [`not_found_page`](#not_found_page). |
+| `not_found_page` | `string` | `"index.html"` | Object served with status 404 for paths that have no object. Keep `"index.html"` for single-page apps; set `"404.html"` for multi-page sites. See [`not_found_page`](#not_found_page). |
 
 ### Branch names
 
@@ -85,10 +85,12 @@ Branch names are used in resource names and DNS labels, so:
 
 Cloud Storage serves this object when a path has neither an object nor an `index.html` under it, always with status 404.
 
-- Single-page apps: keep the default `index.html`, so client-side routes such as `/some/route` load the app.
-- Static site generators (Hugo, Jekyll, Astro, Eleventy, Next.js static export): set `"404.html"` and upload it to the bucket root.
+- **Single-page apps** with client-side routing (Vue Router's `createWebHistory`, React Router's `BrowserRouter`, etc.): keep the default `index.html`, so routes such as `/about` load the app.
+- **Multi-page sites** from static site generators (Hugo, Jekyll, Astro, Eleventy, Next.js static export): set `"404.html"`, and make sure the build uploads it to the bucket root.
 
-Crawlers and uptime checks therefore see a single-page app's deep links as 404s. Answering them with 200 would need a load balancer custom error response policy, which only works when the load balancer also has a backend service, not just backend buckets.
+> **Warning:** don't set `"404.html"` for a single-page app. Navigating inside the app still works, but opening or refreshing a route such as `/about` shows the 404 page instead of the app, or Cloud Storage's own error page if the build has no `404.html`.
+
+Because the status is always 404, crawlers and uptime checks see a single-page app's deep links as 404s. Answering them with 200 would need a load balancer custom error response policy, which only works when the load balancer also has a backend service, not just backend buckets.
 
 ### `dns_config`
 
