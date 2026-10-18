@@ -1,5 +1,6 @@
-# No Cloud DNS zone, CI/CD with a token already in Secret Manager and build SAs
-# passed in through build_sa_ids.
+# No Cloud DNS zone, CI/CD with a token already in Secret Manager and a build SA
+# passed in through build_sa_ids, which gets the module's roles (CDN on, so the
+# invalidation role too).
 
 terraform {
   backend "gcs" {}

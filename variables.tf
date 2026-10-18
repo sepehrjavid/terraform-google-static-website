@@ -48,6 +48,10 @@ variable "cicd" {
     error_message = "When cicd.enable is true, each branch in var.branches must have a corresponding key in cicd.build_sa_ids."
   }
   validation {
+    condition     = var.cicd.build_sa_ids == null || alltrue([for id in values(var.cicd.build_sa_ids) : can(regex("^projects/[^/]+/serviceAccounts/[^/]+$", id))])
+    error_message = "cicd.build_sa_ids values must be in the format projects/{project}/serviceAccounts/{email}."
+  }
+  validation {
     condition     = !var.cicd.enable || var.cicd.build_sa_ids != null || alltrue([for b in var.branches : length("${var.name_prefix}-${b}-build") <= 30])
     error_message = "name_prefix and branch name are too long: service account ID \"<name_prefix>-<branch>-build\" must be at most 30 characters. Shorten them or provide cicd.build_sa_ids."
   }
