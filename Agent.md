@@ -2,6 +2,14 @@
 
 How to write code in this repo. Also follow the conventions and checks in [CLAUDE.md](CLAUDE.md).
 
+## Keep users away from security mistakes
+
+Design decisions must steer users, including those who don't know the risks, away from insecure setups.
+
+- Secure by default: grant the least privilege needed, and keep environments (branches) isolated, e.g. one service account per branch, so one environment can't affect another.
+- Don't add options that make an insecure setup easy, even when they're convenient. Where the module can detect an unsafe input, reject it in `variables.tf` with a message that explains the risk. Where it can't, warn in the README.
+- When security and convenience or simplicity conflict, choose security, and explain the trade-off in the PR.
+
 ## Keep it simple
 
 - Write the simplest Terraform that works. Don't add variables, locals, resources or abstractions that aren't needed.
