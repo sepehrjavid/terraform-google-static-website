@@ -32,3 +32,31 @@ To do:
 1. Reproduce: add a branch to a running e2e deployment.
 2. Confirm in the Certificate Manager docs that a DNS authorization covers its wildcard.
 3. Add an e2e case that changes `branches` on an existing deployment.
+
+## A build SA shared by several branches loses its project roles when one branch goes
+
+**Status:** follows from how `google_project_iam_member` works. Applies once #9 merges (it grants the build roles to SAs passed in `build_sa_ids`). Documented in the README under "Build service account roles".
+
+### When
+
+Several branches in `cicd.build_sa_ids` use the same service account, and one of them is removed from `branches` or given another service account.
+
+### Why
+
+The project roles (`roles/logging.logWriter` and the CDN invalidation role) are granted once per branch: `google_project_iam_member.website_log_writer[<branch>]` and `google_project_iam_member.build_sa_cdn_invalidator[<branch>]`. With a shared service account, several resources manage the same role and member, but IAM stores that member only once per role.
+
+Creating and keeping them is harmless: the extra grants are no-ops. Destroying one, though, removes the member from the role for every branch. The other resources are still in the state, so the next plan adds the member back, but until that apply the remaining branches' builds can't write logs or invalidate the CDN cache.
+
+The grants can't be keyed by email to de-duplicate them: SAs created in the same configuration (like the `manual-dns-cicd` e2e case) are only known after apply, and `for_each` keys must be known at plan time.
+
+Bucket grants aren't affected, since each branch has its own bucket.
+
+### Proposed fix
+
+Add an optional `cicd.build_sa_id` (one service account for every branch), mutually exclusive with `build_sa_ids`. With it, the module grants the project roles once, under a fixed key, so removing a branch only removes that branch's bucket grant. That covers the common case of one deploy SA. `build_sa_ids` keeps the current behaviour, for mixed setups.
+
+To do:
+
+1. Add `cicd.build_sa_id` with validation (format, and not together with `build_sa_ids`).
+2. Unit tests: one project grant per role with `build_sa_id`; removing a branch leaves the project grants in place.
+3. Point the README note on shared service accounts to `build_sa_id`.
