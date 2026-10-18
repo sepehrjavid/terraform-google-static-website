@@ -60,3 +60,18 @@ To do:
 
 1. Check whether IAM conditions support Compute Engine URL maps and `compute.urlMaps.invalidateCache`. If they do, add a condition on `resource.name` that limits the grant to this module's URL map, which protects other load balancers in the project.
 2. That still lets one branch's build invalidate another branch's paths, since all branches share the URL map. Check whether anything can limit invalidation to a branch's own host; if not, document it in the README.
+
+## Browsers cache fingerprinted assets for an hour, not a year
+
+**Status:** seen on a real deploy. Cloud CDN's defaults, not a module bug.
+
+### Why
+
+The backend buckets use Cloud CDN's default cache settings: `CACHE_ALL_STATIC`, `client_ttl` 3600 and `max_ttl` 86400. In that mode Cloud CDN caps the `max-age` it sends to browsers at `client_ttl`, so an asset uploaded with `public, max-age=31536000, immutable` reaches browsers as `public,max-age=3600,immutable`. Fingerprinted files are revalidated every hour: correct, but slower than it could be.
+
+### Proposed fix
+
+To do:
+
+1. Check `cdn_policy` on `google_compute_backend_bucket` (`cache_mode`, `client_ttl`, `default_ttl`, `max_ttl`) in the provider and Cloud CDN docs, including which changes force replacement.
+2. Raise `client_ttl` and `max_ttl` (up to a year) so the uploaded `Cache-Control` decides, or expose them as inputs. Objects with `no-cache`, like `index.html`, are revalidated either way.
