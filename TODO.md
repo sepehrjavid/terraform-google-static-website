@@ -25,7 +25,7 @@ Use one certificate for `<domain>` and `*.<domain>`, with a single DNS authoriza
 
 Existing deployments switch certificates once. That needs `create_before_destroy` and a new certificate name, and there's a short window while the new certificate is issued. Document it in the release notes.
 
-Do this after #10 merges, since #10 reworks the same DNS authorization and DNS record code.
+Build on #10's `local.domains`, which now drives the DNS authorizations, host rules and DNS records.
 
 To do:
 
@@ -35,7 +35,7 @@ To do:
 
 ## A build SA shared by several branches loses its project roles when one branch goes
 
-**Status:** follows from how `google_project_iam_member` works. Applies once #9 merges (it grants the build roles to SAs passed in `build_sa_ids`). Documented in the README under "Build service account roles".
+**Status:** follows from how `google_project_iam_member` works. Applies since #9, which grants the build roles to SAs passed in `build_sa_ids`. Documented in the README under "Build service account roles".
 
 ### When
 
