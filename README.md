@@ -6,9 +6,9 @@ Each branch in `branches` gets its own public Cloud Storage bucket, served throu
 
 ## What it creates
 
-- **Per branch**: a bucket `<name_prefix>-<branch>-website-bucket` (public read, `index.html` as main and not-found page), a backend bucket (with Cloud CDN when `enable_cdn` is `true`) and a Certificate Manager DNS authorization.
-- **Load balancer**: a global external Application Load Balancer (`EXTERNAL_MANAGED`) with a static IP, a Google-managed certificate covering all branch domains and, when `enable_http_redirect` is `true`, an HTTP to HTTPS redirect.
-- **DNS** (when `dns_config.set_dns_config` is `true`): an A record for the domain, a CNAME for each branch subdomain and the certificate validation records.
+- **Per branch**: a bucket `<name_prefix>-<branch>-website-bucket` (public read, `index.html` as main page and [`not_found_page`](#not_found_page) for paths that have no object), a backend bucket (with Cloud CDN when `enable_cdn` is `true`) and a Certificate Manager DNS authorization.
+- **Load balancer**: a global external Application Load Balancer (`EXTERNAL_MANAGED`) with a static IP, a Google-managed certificate covering all branch domains and, when `enable_http_redirect` is `true`, an HTTP to HTTPS redirect. When `enable_www_redirect` is `true`, the certificate also covers `www.<domain>`, which redirects to the domain.
+- **DNS** (when `dns_config.set_dns_config` is `true`): an A record for the domain, a CNAME for each branch subdomain (and for `www` when `enable_www_redirect` is `true`) and the certificate validation records.
 - **CI/CD** (when `cicd.enable` is `true`): a Cloud Build GitHub connection (unless you pass an existing one), the linked repository and a push trigger per branch. Each branch gets a build service account `<name_prefix>-<branch>-build`, unless you pass your own in `build_sa_ids`. Either way, each branch's build service account gets `roles/storage.objectUser` on its bucket, `roles/logging.logWriter` and, when `enable_cdn` is `true`, a custom role that lets it invalidate the CDN cache (see [Build config](#build-config) and [Build service account roles](#build-service-account-roles)).
 
 The module enables the Certificate Manager API, and the Cloud Build and Secret Manager APIs when CI/CD is enabled.
@@ -69,6 +69,8 @@ This serves `main` at `https://example.com` and `develop` at `https://develop.ex
 | `lb` | `object` | `{}` | Extra load balancer backends. See [`lb`](#lb). |
 | `enable_cdn` | `bool` | `true` | Enable Cloud CDN on the bucket backends. |
 | `enable_http_redirect` | `bool` | `true` | Redirect HTTP (port 80) to HTTPS. |
+| `enable_www_redirect` | `bool` | `false` | Redirect `www.<domain>` to the domain with a 301, keeping the path and query. See [DNS](#dns). |
+| `not_found_page` | `string` | `"index.html"` | Object served with status 404 for paths that have no object, e.g. `"404.html"`. See [`not_found_page`](#not_found_page). |
 
 ### Branch names
 
@@ -76,7 +78,17 @@ Branch names are used in resource names and DNS labels, so:
 
 - they may only contain lowercase letters, digits and hyphens, must start with a letter and must not end with a hyphen;
 - `<name_prefix>-<branch>-website-bucket` must be at most 63 characters;
-- `<name_prefix>-<branch>-build` must be at most 30 characters when the module creates the build service accounts (CI/CD enabled without `build_sa_ids`).
+- `<name_prefix>-<branch>-build` must be at most 30 characters when the module creates the build service accounts (CI/CD enabled without `build_sa_ids`);
+- no branch may be named `www` when `enable_www_redirect` is `true`.
+
+### `not_found_page`
+
+Cloud Storage serves this object when a path has neither an object nor an `index.html` under it, always with status 404.
+
+- Single-page apps: keep the default `index.html`, so client-side routes such as `/some/route` load the app.
+- Static site generators (Hugo, Jekyll, Astro, Eleventy, Next.js static export): set `"404.html"` and upload it to the bucket root.
+
+Crawlers and uptime checks therefore see a single-page app's deep links as 404s. Answering them with 200 would need a load balancer custom error response policy, which only works when the load balancer also has a backend service, not just backend buckets.
 
 ### `dns_config`
 
@@ -191,7 +203,7 @@ lb = {
 | Name | Description |
 |------|-------------|
 | `lb_ip` | Load balancer IP address. |
-| `dns_auth_creds` | Certificate validation records to create yourself, keyed by branch: record name (`cname`), `type` and value (`secret`). `null` when `set_dns_config` is `true`. |
+| `dns_auth_creds` | Certificate validation records to create yourself, keyed by branch (plus `www` when `enable_www_redirect` is `true`): record name (`cname`), `type` and value (`secret`). `null` when `set_dns_config` is `true`. |
 | `buckets` | Bucket name per branch. |
 | `github_connection_name` | Name of the Cloud Build GitHub connection in use. `null` when CI/CD is disabled. |
 | `build_sa` | Build service accounts created by the module, keyed by branch. |
@@ -201,12 +213,15 @@ lb = {
 
 The website domain is the apex of the DNS zone (or `domain_name` when no zone is given). If the apex is already in use, for example by another site at `example.com`, create a separate Cloud DNS zone for a subdomain such as `www.example.com`. Delegate it with NS records in the parent zone and pass that zone as `zone_name`. Branches are then served at `<branch>.www.example.com`.
 
+With `enable_www_redirect = true`, requests to `https://www.<domain>/<path>?<query>` get a 301 to `https://<domain>/<path>?<query>`, and `http://www.<domain>` is first redirected to HTTPS. The certificate gets `www.<domain>` with its own DNS authorization. This is meant for an apex domain such as `example.com`: with a delegated zone such as `www.example.com`, it would redirect `www.www.example.com`.
+
 There are two ways to set up the records:
 
-- **Automated** (`set_dns_config = true`): the module creates all records in the zone given by `zone_name`.
+- **Automated** (`set_dns_config = true`): the module creates all records in the zone given by `zone_name`. With `enable_www_redirect`, the zone must not already have a `www` record.
 - **Manual** (default): create these records with your DNS provider:
   - an `A` record for the domain, pointing to `lb_ip`;
   - for every other branch, a `CNAME` from `<branch>.<domain>` to the domain;
+  - with `enable_www_redirect`, a `CNAME` from `www.<domain>` to the domain;
   - the certificate validation records from the `dns_auth_creds` output.
 
 The certificate is issued once the validation records resolve, which can take a while. HTTPS requests fail until then.

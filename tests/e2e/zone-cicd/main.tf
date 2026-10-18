@@ -1,6 +1,7 @@
 # Existing Cloud DNS zone with domain_name set to the zone's DNS name (trailing
 # dot), CI/CD with a token the module stores and build SAs it creates, CDN on
-# (so the build SAs get the cache invalidation role) and HTTP redirect off.
+# (so the build SAs get the cache invalidation role), HTTP redirect off and
+# 404.html for unknown paths (not_found_page).
 
 terraform {
   backend "gcs" {}
@@ -42,6 +43,7 @@ module "website" {
   branches             = ["e2e"]
   default_branch_name  = "e2e"
   enable_http_redirect = false
+  not_found_page       = "404.html"
 
   cicd = {
     repo_uri = "https://github.com/sepehrjavid/terraform-google-static-website.git"

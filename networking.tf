@@ -22,10 +22,10 @@ resource "time_sleep" "wait_30_seconds_cert" {
 }
 
 resource "google_certificate_manager_dns_authorization" "default" {
-  for_each   = var.branches
+  for_each   = local.domains
   project    = var.project_id
   name       = "${var.name_prefix}-${each.key}-dns-auth"
-  domain     = each.key == var.default_branch_name ? local.domain_name : "${each.key}.${local.domain_name}"
+  domain     = each.value
   depends_on = [time_sleep.wait_30_seconds_cert]
 }
 
@@ -79,8 +79,16 @@ resource "google_compute_url_map" "default" {
   dynamic "host_rule" {
     for_each = var.branches
     content {
-      hosts        = [host_rule.value == var.default_branch_name ? local.domain_name : "${host_rule.value}.${local.domain_name}"]
+      hosts        = [local.domains[host_rule.value]]
       path_matcher = "${host_rule.value}-matcher"
+    }
+  }
+
+  dynamic "host_rule" {
+    for_each = var.enable_www_redirect ? [1] : []
+    content {
+      hosts        = [local.domains.www]
+      path_matcher = "www-redirect"
     }
   }
 
@@ -110,6 +118,21 @@ resource "google_compute_url_map" "default" {
       path_rule {
         paths   = ["/*"]
         service = google_compute_backend_bucket.backends[path_matcher.value].id
+      }
+    }
+  }
+
+  dynamic "path_matcher" {
+    for_each = var.enable_www_redirect ? [1] : []
+    content {
+      name = "www-redirect"
+
+      # Keeps the request's https scheme: https_redirect isn't allowed on a URL
+      # map used by an HTTPS proxy.
+      default_url_redirect {
+        host_redirect          = local.domain_name
+        strip_query            = false
+        redirect_response_code = "MOVED_PERMANENTLY_DEFAULT"
       }
     }
   }
