@@ -96,6 +96,29 @@ variable "enable_http_redirect" {
   default     = true
 }
 
+variable "enable_www_redirect" {
+  description = "Redirects www.<domain> to the domain (the default branch), keeping the path and query."
+  type        = bool
+  default     = false
+
+  validation {
+    condition     = !var.enable_www_redirect || !contains(var.branches, "www")
+    error_message = "A branch can't be named \"www\" when enable_www_redirect is true: its domain, DNS records and DNS authorization would clash with the www redirect."
+  }
+}
+
+variable "not_found_page" {
+  description = "Object served, with status 404, for paths that have no object, e.g. \"404.html\" for static site generators. The default \"index.html\" suits single-page apps."
+  type        = string
+  default     = "index.html"
+  nullable    = false
+
+  validation {
+    condition     = var.not_found_page != "" && !startswith(var.not_found_page, "/")
+    error_message = "not_found_page must be the name of an object in the bucket, without a leading \"/\", e.g. \"404.html\"."
+  }
+}
+
 variable "default_branch_name" {
   description = "The name of the default production branch."
   type        = string

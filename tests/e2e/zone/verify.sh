@@ -20,4 +20,9 @@ upload "$(terraform output -raw api_bucket)" ping.txt ping
 ../wait-for-url.sh https://lab.sepehrjavid.com/api "api $marker"
 ../wait-for-url.sh https://lab.sepehrjavid.com/api/ping.txt "ping $marker"
 
+# Unknown paths get index.html (the default not_found_page), with status 404.
+../wait-for-not-found.sh https://lab.sepehrjavid.com/some/route "main $marker"
+
 ../wait-for-redirect.sh http://lab.sepehrjavid.com/ https://lab.sepehrjavid.com/
+../wait-for-redirect.sh https://www.lab.sepehrjavid.com/ https://lab.sepehrjavid.com/
+../wait-for-redirect.sh "https://www.lab.sepehrjavid.com/some/route?q=1" "https://lab.sepehrjavid.com/some/route?q=1"

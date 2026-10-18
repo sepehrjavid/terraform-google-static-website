@@ -9,7 +9,7 @@ resource "google_storage_bucket" "website_bucket" {
 
   website {
     main_page_suffix = "index.html"
-    not_found_page   = "index.html"
+    not_found_page   = var.not_found_page
   }
 }
 

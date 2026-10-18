@@ -1,5 +1,5 @@
 resource "google_dns_record_set" "cert_auth" {
-  for_each     = var.dns_config.set_dns_config ? var.branches : []
+  for_each     = var.dns_config.set_dns_config ? local.domains : {}
   name         = google_certificate_manager_dns_authorization.default[each.key].dns_resource_record[0].name
   project      = var.project_id
   managed_zone = var.dns_config.zone_name
@@ -19,12 +19,11 @@ resource "google_dns_record_set" "website_ip_record" {
 }
 
 resource "google_dns_record_set" "website_dub_domanins" {
-  for_each     = var.dns_config.set_dns_config ? { for branch in var.branches : branch => branch if branch != var.default_branch_name } : {}
-  name         = "${each.key}.${local.domain_name}."
+  for_each     = var.dns_config.set_dns_config ? { for key, domain in local.domains : key => domain if key != var.default_branch_name } : {}
+  name         = "${each.value}."
   project      = var.project_id
   managed_zone = var.dns_config.zone_name
   type         = "CNAME"
   ttl          = 300
   rrdatas      = ["${local.domain_name}."]
 }
-
