@@ -20,7 +20,7 @@ variable "domain" {
 }
 
 module "website" {
-  # When copying this example, use source = "sepehrjavid/static-website/google" with version = "~> 2.0".
+  # When copying this example, use source = "sepehrjavid/static-website/google" with version = "~> 3.0".
   source = "../.."
 
   project_id  = var.project_id
