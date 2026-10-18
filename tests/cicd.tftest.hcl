@@ -276,19 +276,48 @@ run "no_cdn_invalidator_without_cdn" {
   }
 }
 
-run "no_cdn_invalidator_with_own_build_sas" {
+run "own_build_sas_get_the_same_roles" {
+  command = plan
+  variables {
+    branches = ["main", "dev"]
+    cicd = {
+      repo_uri              = "https://github.com/a/b.git"
+      existing_gh_conn_name = "c"
+      build_sa_ids = {
+        main = "projects/other/serviceAccounts/deploy@other.iam.gserviceaccount.com"
+        dev  = "projects/other/serviceAccounts/deploy@other.iam.gserviceaccount.com"
+      }
+    }
+  }
+  assert {
+    condition     = length(google_service_account.website_build_sa) == 0
+    error_message = "No build SAs should be created when they're passed in."
+  }
+  assert {
+    condition = alltrue([for b in ["main", "dev"] : (
+      google_storage_bucket_iam_member.build_sa_write_access[b].bucket == "x-${b}-website-bucket" &&
+      google_storage_bucket_iam_member.build_sa_write_access[b].member == "serviceAccount:deploy@other.iam.gserviceaccount.com" &&
+      google_project_iam_member.website_log_writer[b].member == "serviceAccount:deploy@other.iam.gserviceaccount.com" &&
+      google_project_iam_member.build_sa_cdn_invalidator[b].member == "serviceAccount:deploy@other.iam.gserviceaccount.com"
+    )])
+    error_message = "Build SAs passed in should get write access to their bucket, the log writer role and the CDN invalidation role."
+  }
+  assert {
+    condition     = length(google_project_iam_custom_role.cdn_invalidator) == 1
+    error_message = "The CDN invalidation role should be created for build SAs passed in."
+  }
+}
+
+run "build_sa_ids_wrong_format_rejected" {
   command = plan
   variables {
     cicd = {
       repo_uri              = "https://github.com/a/b.git"
       existing_gh_conn_name = "c"
-      build_sa_ids          = { main = "projects/p/serviceAccounts/a@p.iam.gserviceaccount.com" }
+      build_sa_ids          = { main = "deploy@other.iam.gserviceaccount.com" }
     }
   }
-  assert {
-    condition     = length(google_project_iam_custom_role.cdn_invalidator) == 0 && length(google_project_iam_member.build_sa_cdn_invalidator) == 0
-    error_message = "No roles should be granted to build SAs passed in."
-  }
+  expect_failures = [var.cicd]
 }
 
 run "no_cdn_invalidator_without_cicd" {

@@ -9,7 +9,7 @@ Each branch in `branches` gets its own public Cloud Storage bucket, served throu
 - **Per branch**: a bucket `<name_prefix>-<branch>-website-bucket` (public read, `index.html` as main and not-found page), a backend bucket (with Cloud CDN when `enable_cdn` is `true`) and a Certificate Manager DNS authorization.
 - **Load balancer**: a global external Application Load Balancer (`EXTERNAL_MANAGED`) with a static IP, a Google-managed certificate covering all branch domains and, when `enable_http_redirect` is `true`, an HTTP to HTTPS redirect.
 - **DNS** (when `dns_config.set_dns_config` is `true`): an A record for the domain, a CNAME for each branch subdomain and the certificate validation records.
-- **CI/CD** (when `cicd.enable` is `true`): a Cloud Build GitHub connection (unless you pass an existing one), the linked repository and a push trigger per branch. Unless you pass `build_sa_ids`, each branch gets a build service account `<name_prefix>-<branch>-build` with `roles/storage.objectUser` on its bucket, `roles/logging.logWriter` and, when `enable_cdn` is `true`, a custom role that lets it invalidate the CDN cache (see [Build config](#build-config)).
+- **CI/CD** (when `cicd.enable` is `true`): a Cloud Build GitHub connection (unless you pass an existing one), the linked repository and a push trigger per branch. Each branch gets a build service account `<name_prefix>-<branch>-build`, unless you pass your own in `build_sa_ids`. Either way, each branch's build service account gets `roles/storage.objectUser` on its bucket, `roles/logging.logWriter` and, when `enable_cdn` is `true`, a custom role that lets it invalidate the CDN cache (see [Build config](#build-config) and [Build service account roles](#build-service-account-roles)).
 
 The module enables the Certificate Manager API, and the Cloud Build and Secret Manager APIs when CI/CD is enabled.
 
@@ -18,9 +18,9 @@ The module enables the Certificate Manager API, and the Cloud Build and Secret M
 - Terraform `>= 1.13` and the `hashicorp/google` provider `>= 7.0`.
 - These APIs enabled on the project:
   - Compute Engine (`compute.googleapis.com`)
-  - IAM (`iam.googleapis.com`), when the module creates the build service accounts
+  - IAM (`iam.googleapis.com`), when the module creates the build service accounts or, with CI/CD and `enable_cdn` both `true`, the CDN invalidation role
   - Cloud DNS (`dns.googleapis.com`), when `zone_name` is set
-- When the module creates the build service accounts and `enable_cdn` is `true`, whoever runs Terraform needs permission to manage custom roles in the project, e.g. Role Administrator (`roles/iam.roleAdmin`). Custom roles are managed through the IAM API listed above.
+- When CI/CD and `enable_cdn` are both `true`, whoever runs Terraform needs permission to manage custom roles in the project, e.g. Role Administrator (`roles/iam.roleAdmin`). Custom roles are managed through the IAM API listed above.
 - The project must allow public buckets: the `storage.publicAccessPrevention` and `iam.allowedPolicyMemberDomains` org policies must not block `allUsers`.
 - A domain you control, at any registrar. For automated DNS, a Cloud DNS zone in `project_id` whose apex is the website domain (see [DNS](#dns)).
 - For CI/CD with a new GitHub connection:
@@ -95,7 +95,19 @@ Branch names are used in resource names and DNS labels, so:
 | `existing_gh_conn_name` | `string` | `null` | Name of an existing Cloud Build GitHub connection in `project_id` and `region`. When set, `github_config` is ignored. |
 | `github_config` | `object` | `null` | Settings for a new GitHub connection. Required when `enable` is `true` and `existing_gh_conn_name` isn't set. |
 | `build_config_filename` | `string` | `"cloudbuild.yaml"` | Path of the Cloud Build config file in the repository. |
-| `build_sa_ids` | `map(string)` | `null` | Your own build service accounts, keyed by branch, as `projects/{project}/serviceAccounts/{email}`. Must have an entry for every branch. When set, the module creates no service accounts and grants no roles, so give them write access to the buckets and permission to write logs yourself. To invalidate the CDN cache, they also need `compute.urlMaps.invalidateCache` on the project. |
+| `build_sa_ids` | `map(string)` | `null` | Your own build service accounts, keyed by branch, as `projects/{project}/serviceAccounts/{email}`. Must have an entry for every branch. When set, the module creates no service accounts, but grants yours the same roles as its own (see [Build service account roles](#build-service-account-roles)). |
+
+#### Build service account roles
+
+Each branch's build service account, created by the module or passed in `build_sa_ids`, gets:
+
+- `roles/storage.objectUser` on the branch's bucket;
+- `roles/logging.logWriter` on the project;
+- when `enable_cdn` is `true`, the CDN invalidation role on the project (see [Build config](#build-config)).
+
+The module grants these one branch at a time. If several branches share a service account, removing one of them, or giving it another service account, revokes the shared project roles. The next `terraform apply` grants them again.
+
+> **Warning:** the module adds the project roles with `google_project_iam_member`, which leaves the role's other members alone. If something else manages `roles/logging.logWriter` in this project authoritatively, with `google_project_iam_binding` or `google_project_iam_policy`, every apply of that configuration removes the build service accounts from the role, and the next apply of this module adds them back. Builds can't write logs in between. Add the build service accounts to that binding instead: your own from `build_sa_ids`, or the module's from the `build_sa` output. `google_project_iam_policy` also removes the CDN invalidation grant, and any other project role you don't list in it.
 
 #### `github_config`
 
@@ -119,7 +131,7 @@ Each trigger passes two substitutions to the build:
 
 If your build config defines substitutions with the same names, the trigger's values take precedence. A config that doesn't use them still works, because builds started by a trigger always allow unused substitutions (`ALLOW_LOOSE`).
 
-Cloud Storage serves public objects that have no `Cache-Control` metadata with `public, max-age=3600`, and Cloud CDN caches them for that long. To make a new version live right away, set `Cache-Control` when you upload, then invalidate the URL map's cache. When `enable_cdn` is `true`, the build service accounts the module creates can do this: they get a custom role, `<name_prefix>_cdn_invalidator_<creation timestamp>` (hyphens become underscores), with only `compute.urlMaps.invalidateCache`. URL maps don't support IAM on the resource itself, so the role is granted on the project, which lets them invalidate the cache of any URL map in the project. Google lists `compute.urlMaps.invalidateCache` at the TESTING support level for custom roles (it may behave unexpectedly and isn't recommended for production); the predefined roles that include it, Load Balancer Admin and Network Admin, are much broader.
+Cloud Storage serves public objects that have no `Cache-Control` metadata with `public, max-age=3600`, and Cloud CDN caches them for that long. To make a new version live right away, set `Cache-Control` when you upload, then invalidate the URL map's cache. When `enable_cdn` is `true`, the build service accounts can do this: they get a custom role, `<name_prefix>_cdn_invalidator_<creation timestamp>` (hyphens become underscores), with only `compute.urlMaps.invalidateCache`. URL maps don't support IAM on the resource itself, so the role is granted on the project, which lets them invalidate the cache of any URL map in the project. Google lists `compute.urlMaps.invalidateCache` at the TESTING support level for custom roles (it may behave unexpectedly and isn't recommended for production); the predefined roles that include it, Load Balancer Admin and Network Admin, are much broader.
 
 For a site that `npm run build` writes to `dist/`:
 
