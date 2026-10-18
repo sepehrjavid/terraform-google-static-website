@@ -108,7 +108,7 @@ variable "enable_www_redirect" {
 }
 
 variable "not_found_page" {
-  description = "Object served, with status 404, for paths that have no object, e.g. \"404.html\" for static site generators. The default \"index.html\" suits single-page apps."
+  description = "Object served, with status 404, for paths that have no object. Keep \"index.html\" for single-page apps with client-side routing; set \"404.html\" for multi-page sites from static site generators."
   type        = string
   default     = "index.html"
   nullable    = false
