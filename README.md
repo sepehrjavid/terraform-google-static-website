@@ -32,7 +32,7 @@ The module enables the Certificate Manager API, and the Cloud Build and Secret M
 ```hcl
 module "website" {
   source  = "sepehrjavid/static-website/google"
-  version = "~> 2.0"
+  version = "~> 3.0"
 
   project_id  = "my-project"
   region      = "europe-west1"
@@ -255,3 +255,12 @@ The rest depends on usage:
 [Certificate Manager](https://cloud.google.com/certificate-manager/pricing) is free at this scale: the module deploys one certificate, and a project's first 100 are free.
 
 For a single small site with no per-branch environments, a free static hosting service can be cheaper.
+
+## Upgrading from 2.x
+
+- With CI/CD and `enable_cdn` both `true` (the defaults), the module creates a custom role that lets the builds invalidate the CDN cache. Whoever runs Terraform needs permission to manage custom roles, e.g. `roles/iam.roleAdmin`.
+- Service accounts passed in `build_sa_ids` now get the same roles as the module's own (see [Build service account roles](#build-service-account-roles)), so whoever runs Terraform needs permission to grant them, e.g. `roles/resourcemanager.projectIamAdmin`. If your configuration already grants these roles with `google_project_iam_binding` or `google_storage_bucket_iam_binding`, include the build service accounts there, or drop those bindings with a `removed` block so the module manages the grants.
+- `build_sa_ids` is stricter, and both of these now fail at plan:
+  - a service account shared by several branches: give each branch its own;
+  - a service account ID instead of its email: use `projects/{project}/serviceAccounts/{email}`.
+- The new inputs, `enable_www_redirect` and `not_found_page`, default to the 2.x behaviour.
