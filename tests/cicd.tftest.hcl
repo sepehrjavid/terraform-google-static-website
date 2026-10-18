@@ -285,8 +285,8 @@ run "own_build_sas_get_the_same_roles" {
       repo_uri              = "https://github.com/a/b.git"
       existing_gh_conn_name = "c"
       build_sa_ids = {
-        main = "projects/other/serviceAccounts/deploy@other.iam.gserviceaccount.com"
-        dev  = "projects/other/serviceAccounts/deploy@other.iam.gserviceaccount.com"
+        main = "projects/other/serviceAccounts/deploy-main@other.iam.gserviceaccount.com"
+        dev  = "projects/other/serviceAccounts/deploy-dev@other.iam.gserviceaccount.com"
       }
     }
   }
@@ -297,9 +297,9 @@ run "own_build_sas_get_the_same_roles" {
   assert {
     condition = alltrue([for b in ["main", "dev"] : (
       google_storage_bucket_iam_member.build_sa_write_access[b].bucket == "x-${b}-website-bucket" &&
-      google_storage_bucket_iam_member.build_sa_write_access[b].member == "serviceAccount:deploy@other.iam.gserviceaccount.com" &&
-      google_project_iam_member.website_log_writer[b].member == "serviceAccount:deploy@other.iam.gserviceaccount.com" &&
-      google_project_iam_member.build_sa_cdn_invalidator[b].member == "serviceAccount:deploy@other.iam.gserviceaccount.com"
+      google_storage_bucket_iam_member.build_sa_write_access[b].member == "serviceAccount:deploy-${b}@other.iam.gserviceaccount.com" &&
+      google_project_iam_member.website_log_writer[b].member == "serviceAccount:deploy-${b}@other.iam.gserviceaccount.com" &&
+      google_project_iam_member.build_sa_cdn_invalidator[b].member == "serviceAccount:deploy-${b}@other.iam.gserviceaccount.com"
     )])
     error_message = "Build SAs passed in should get write access to their bucket, the log writer role and the CDN invalidation role."
   }
@@ -316,6 +316,50 @@ run "build_sa_ids_wrong_format_rejected" {
       repo_uri              = "https://github.com/a/b.git"
       existing_gh_conn_name = "c"
       build_sa_ids          = { main = "deploy@other.iam.gserviceaccount.com" }
+    }
+  }
+  expect_failures = [var.cicd]
+}
+
+run "build_sa_ids_with_account_id_rejected" {
+  command = plan
+  variables {
+    cicd = {
+      repo_uri              = "https://github.com/a/b.git"
+      existing_gh_conn_name = "c"
+      build_sa_ids          = { main = "projects/other/serviceAccounts/deploy" }
+    }
+  }
+  expect_failures = [var.cicd]
+}
+
+run "shared_build_sa_rejected" {
+  command = plan
+  variables {
+    branches = ["main", "dev"]
+    cicd = {
+      repo_uri              = "https://github.com/a/b.git"
+      existing_gh_conn_name = "c"
+      build_sa_ids = {
+        main = "projects/other/serviceAccounts/deploy@other.iam.gserviceaccount.com"
+        dev  = "projects/other/serviceAccounts/deploy@other.iam.gserviceaccount.com"
+      }
+    }
+  }
+  expect_failures = [var.cicd]
+}
+
+run "shared_build_sa_with_another_project_form_rejected" {
+  command = plan
+  variables {
+    branches = ["main", "dev"]
+    cicd = {
+      repo_uri              = "https://github.com/a/b.git"
+      existing_gh_conn_name = "c"
+      build_sa_ids = {
+        main = "projects/other/serviceAccounts/deploy@other.iam.gserviceaccount.com"
+        dev  = "projects/-/serviceAccounts/deploy@other.iam.gserviceaccount.com"
+      }
     }
   }
   expect_failures = [var.cicd]
