@@ -9,6 +9,7 @@ It creates a bucket, a CDN-enabled backend bucket, a trigger and a build service
 - These APIs are enabled on the project: Compute Engine (`compute.googleapis.com`), IAM (`iam.googleapis.com`) and Cloud DNS (`dns.googleapis.com`). The module enables Certificate Manager, Cloud Build and Secret Manager itself.
 - The project has a Cloud DNS zone whose DNS name is the domain, and your registrar delegates the domain to the zone's name servers.
 - You can manage custom roles in the project, e.g. with Role Administrator (`roles/iam.roleAdmin`). The module creates one that lets the builds invalidate the CDN cache.
+- If `roles/logging.logWriter` is managed authoritatively in the project (`google_project_iam_binding` or `google_project_iam_policy`), add the build service accounts to that binding, or their grant keeps being removed (see the [warning](../../README.md#build-service-account-roles)).
 - The project allows public buckets (see the module's [Requirements](../../README.md#requirements)).
 - The [Cloud Build GitHub App](https://github.com/apps/google-cloud-build) is installed on the site's repository. Its installation ID is the number at the end of the app's configuration page URL.
 - You have a GitHub personal access token (classic) with the `repo`, `read:user` and `read:org` scopes.
@@ -48,7 +49,7 @@ Framework notes:
 
 - **Hugo**: `baseURL` is the branch's own domain (`$_WEBSITE_DOMAIN`), so links and the sitemap on `develop` point to `develop.<domain>`. The config checks out git submodules, where themes often live. They must be public: the build has no credentials for private ones.
 - **Next.js**: the site's `next.config.js` needs `output: 'export'` and `trailingSlash: true`. The comment at the top of the config explains why.
-- Hugo and Next.js write a `404.html`. Set `not_found_page = "404.html"` on the module so missing pages return it.
+- Hugo and Next.js write a `404.html`. Set `not_found_page = "404.html"` on the module so missing pages return it. For the Vite config, or any single-page app with client-side routing, keep the default `index.html` (see the [warning](../../README.md#not_found_page)).
 
 ## Deploy the site
 
