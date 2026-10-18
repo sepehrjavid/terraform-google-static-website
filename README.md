@@ -115,7 +115,7 @@ Because the status is always 404, crawlers and uptime checks see a single-page a
 | `existing_gh_conn_name` | `string` | `null` | Name of an existing Cloud Build GitHub connection in `project_id` and `region`. When set, `github_config` is ignored. |
 | `github_config` | `object` | `null` | Settings for a new GitHub connection. Required when `enable` is `true` and `existing_gh_conn_name` isn't set. |
 | `build_config_filename` | `string` | `"cloudbuild.yaml"` | Path of the Cloud Build config file in the repository. |
-| `build_sa_ids` | `map(string)` | `null` | Your own build service accounts, keyed by branch, as `projects/{project}/serviceAccounts/{email}`. Must have an entry for every branch. When set, the module creates no service accounts, but grants yours the same roles as its own (see [Build service account roles](#build-service-account-roles)). |
+| `build_sa_ids` | `map(string)` | `null` | Your own build service accounts, keyed by branch, as `projects/{project}/serviceAccounts/{email}`. Must have an entry for every branch, each with its own service account. When set, the module creates no service accounts, but grants yours the same roles as its own (see [Build service account roles](#build-service-account-roles)). |
 
 #### Build service account roles
 
@@ -125,7 +125,7 @@ Each branch's build service account, created by the module or passed in `build_s
 - `roles/logging.logWriter` on the project;
 - when `enable_cdn` is `true`, the CDN invalidation role on the project (see [Build config](#build-config)).
 
-The module grants these one branch at a time. If several branches share a service account, removing one of them, or giving it another service account, revokes the shared project roles. The next `terraform apply` grants them again.
+Each branch needs its own service account, and the module rejects one used by more than one branch in `build_sa_ids`. A shared service account would get write access to every branch's bucket, so a build of one branch, say `develop`, could overwrite another branch's site, say production.
 
 > **Warning:** the module adds the project roles with `google_project_iam_member`, which leaves the role's other members alone. If something else manages `roles/logging.logWriter` in this project authoritatively, with `google_project_iam_binding` or `google_project_iam_policy`, every apply of that configuration removes the build service accounts from the role, and the next apply of this module adds them back. Builds can't write logs in between. Add the build service accounts to that binding instead: your own from `build_sa_ids`, or the module's from the `build_sa` output. `google_project_iam_policy` also removes the CDN invalidation grant, and any other project role you don't list in it.
 

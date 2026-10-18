@@ -48,8 +48,12 @@ variable "cicd" {
     error_message = "When cicd.enable is true, each branch in var.branches must have a corresponding key in cicd.build_sa_ids."
   }
   validation {
-    condition     = var.cicd.build_sa_ids == null || alltrue([for id in values(var.cicd.build_sa_ids) : can(regex("^projects/[^/]+/serviceAccounts/[^/]+$", id))])
-    error_message = "cicd.build_sa_ids values must be in the format projects/{project}/serviceAccounts/{email}."
+    condition     = var.cicd.build_sa_ids == null || alltrue([for id in values(var.cicd.build_sa_ids) : can(regex("^projects/[^/]+/serviceAccounts/[^/]+@[^/]+$", id))])
+    error_message = "cicd.build_sa_ids values must be in the format projects/{project}/serviceAccounts/{email}, with the service account's email rather than its ID: the module grants roles to that email."
+  }
+  validation {
+    condition     = var.cicd.build_sa_ids == null || length(distinct([for id in values(var.cicd.build_sa_ids) : regex("[^/]*$", id)])) == length(var.cicd.build_sa_ids)
+    error_message = "Each branch in cicd.build_sa_ids needs its own service account. A shared one gets write access to every branch's bucket, so a build of one branch could overwrite another branch's site."
   }
   validation {
     condition     = !var.cicd.enable || var.cicd.build_sa_ids != null || alltrue([for b in var.branches : length("${var.name_prefix}-${b}-build") <= 30])
