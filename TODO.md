@@ -75,3 +75,25 @@ To do:
 
 1. Check `cdn_policy` on `google_compute_backend_bucket` (`cache_mode`, `client_ttl`, `default_ttl`, `max_ttl`) in the provider and Cloud CDN docs, including which changes force replacement.
 2. Raise `client_ttl` and `max_ttl` (up to a year) so the uploaded `Cache-Control` decides, or expose them as inputs. Objects with `no-cache`, like `index.html`, are revalidated either way.
+
+## No Cloud Armor support
+
+**Status:** feature request. The backend buckets don't set `edge_security_policy`.
+
+### Why
+
+Backend buckets only accept Cloud Armor edge security policies (`CLOUD_ARMOR_EDGE`). Those can allow or deny by client IP and country, and log requests, which is enough to lock non-production branches to an IP allowlist. WAF, managed rules, rate limiting and bot management need a backend security policy, which only attaches to backend services ([docs](https://cloud.google.com/armor/docs/security-policy-overview)).
+
+The load balancer already gets network-level (L3 and L4) DDoS protection without a policy.
+
+### Proposed fix
+
+Add an optional input, for example under `lb`, that takes an edge security policy ID per branch and sets `edge_security_policy` on that branch's backend bucket. Users create the policies; the module only attaches them.
+
+To do:
+
+1. Check what an edge policy can match on. The docs list `request.headers`, `request.path` and `request.query` in one section, but the comparison table marks HTTP filtering as Media CDN only.
+2. Check whether a policy works on a bucket with `enable_cdn` off.
+3. Check which permission attaching a policy needs, and add it to the README.
+4. Add an e2e case: a deny-all policy on a branch returns 403.
+5. Add Cloud Armor to the cost section.
