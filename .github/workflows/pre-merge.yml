@@ -68,4 +68,4 @@ jobs:
         run: tflint --format compact
 
       - name: ShellCheck
-        run: shellcheck tests/e2e/*.sh tests/e2e/*/verify.sh
+        run: shellcheck tests/e2e/*.sh tests/e2e/*/verify.sh tests/e2e/*/update.sh
