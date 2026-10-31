@@ -95,6 +95,10 @@ jobs:
         if: hashFiles(format('tests/e2e/{0}/verify.sh', matrix.case)) != ''
         run: ./verify.sh
 
+      - name: Update
+        if: hashFiles(format('tests/e2e/{0}/update.sh', matrix.case)) != ''
+        run: ./update.sh
+
       - name: Destroy
         if: always()
         run: terraform destroy -auto-approve -input=false

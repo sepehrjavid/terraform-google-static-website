@@ -21,10 +21,6 @@ run "www_off_by_default" {
     error_message = "No www DNS authorization expected."
   }
   assert {
-    condition     = !contains(google_certificate_manager_certificate.default.managed[0].domains, "www.example.com")
-    error_message = "www.example.com should not be on the certificate."
-  }
-  assert {
     condition     = !anytrue([for r in google_compute_url_map.default.host_rule : contains(r.hosts, "www.example.com")])
     error_message = "No www host rule expected."
   }
@@ -50,10 +46,10 @@ run "www_redirect" {
   }
   assert {
     condition = (
-      toset(google_certificate_manager_certificate.default.managed[0].domains) == toset(["example.com", "dev.example.com", "www.example.com"]) &&
-      length(google_certificate_manager_certificate.default.managed[0].dns_authorizations) == 3
+      toset(google_certificate_manager_certificate.default.managed[0].domains) == toset(["example.com", "*.example.com"]) &&
+      length(google_certificate_manager_certificate.default.managed[0].dns_authorizations) == 1
     )
-    error_message = "The certificate should cover www.example.com with its own DNS authorization."
+    error_message = "The wildcard certificate should cover www.example.com, with only the domain's DNS authorization."
   }
   assert {
     condition     = anytrue([for r in google_compute_url_map.default.host_rule : r.hosts == toset(["www.example.com"]) && r.path_matcher == "www-redirect"])

@@ -24,6 +24,13 @@ run "domain_from_zone" {
     condition     = google_certificate_manager_dns_authorization.default["dev"].domain == "dev.www.example.com"
     error_message = "Non-default branches should be served on a subdomain."
   }
+  assert {
+    condition = (
+      toset(google_certificate_manager_certificate.default.managed[0].domains) == toset(["www.example.com", "*.www.example.com"]) &&
+      length(google_certificate_manager_certificate.default.managed[0].dns_authorizations) == 1
+    )
+    error_message = "The certificate should cover the domain and its subdomains, with only the domain's DNS authorization."
+  }
 }
 
 run "domain_matching_zone" {

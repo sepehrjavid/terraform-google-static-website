@@ -7,7 +7,7 @@ Each branch in `branches` gets its own public Cloud Storage bucket, served throu
 ## What it creates
 
 - **Per branch**: a bucket `<name_prefix>-<branch>-website-bucket` (public read, `index.html` as main page and [`not_found_page`](#not_found_page) for paths that have no object), a backend bucket (with Cloud CDN when `enable_cdn` is `true`) and a Certificate Manager DNS authorization.
-- **Load balancer**: a global external Application Load Balancer (`EXTERNAL_MANAGED`) with a static IP, a Google-managed certificate covering all branch domains and, when `enable_http_redirect` is `true`, an HTTP to HTTPS redirect. When `enable_www_redirect` is `true`, the certificate also covers `www.<domain>`, which redirects to the domain.
+- **Load balancer**: a global external Application Load Balancer (`EXTERNAL_MANAGED`) with a static IP, a Google-managed certificate for `<domain>` and `*.<domain>` and, when `enable_http_redirect` is `true`, an HTTP to HTTPS redirect. When `enable_www_redirect` is `true`, `www.<domain>` redirects to the domain. The wildcard covers every branch and `www`, so adding or removing them doesn't change the certificate.
 - **DNS** (when `dns_config.set_dns_config` is `true`): an A record for the domain, a CNAME for each branch subdomain (and for `www` when `enable_www_redirect` is `true`) and the certificate validation records.
 - **CI/CD** (when `cicd.enable` is `true`): a Cloud Build GitHub connection (unless you pass an existing one), the linked repository and a push trigger per branch. Each branch gets a build service account `<name_prefix>-<branch>-build`, unless you pass your own in `build_sa_ids`. Either way, each branch's build service account gets `roles/storage.objectUser` on its bucket, `roles/logging.logWriter` and, when `enable_cdn` is `true`, a custom role that lets it invalidate the CDN cache (see [Build config](#build-config) and [Build service account roles](#build-service-account-roles)).
 
@@ -224,7 +224,7 @@ lb = {
 
 The website domain is the apex of the DNS zone (or `domain_name` when no zone is given). If the apex is already in use, for example by another site at `example.com`, create a separate Cloud DNS zone for a subdomain such as `www.example.com`. Delegate it with NS records in the parent zone and pass that zone as `zone_name`. Branches are then served at `<branch>.www.example.com`.
 
-With `enable_www_redirect = true`, requests to `https://www.<domain>/<path>?<query>` get a 301 to `https://<domain>/<path>?<query>`, and `http://www.<domain>` is first redirected to HTTPS. The certificate gets `www.<domain>` with its own DNS authorization. This is meant for an apex domain such as `example.com`: with a delegated zone such as `www.example.com`, it would redirect `www.www.example.com`.
+With `enable_www_redirect = true`, requests to `https://www.<domain>/<path>?<query>` get a 301 to `https://<domain>/<path>?<query>`, and `http://www.<domain>` is first redirected to HTTPS. This is meant for an apex domain such as `example.com`: with a delegated zone such as `www.example.com`, it would redirect `www.www.example.com`.
 
 There are two ways to set up the records:
 
@@ -235,7 +235,9 @@ There are two ways to set up the records:
   - with `enable_www_redirect`, a `CNAME` from `www.<domain>` to the domain;
   - the certificate validation records from the `dns_auth_creds` output.
 
-The certificate is issued once the validation records resolve, which can take a while. HTTPS requests fail until then.
+The certificate only needs the default branch's validation record, which also covers `*.<domain>`. The other branches' and `www`'s are left over from 3.0, where each domain had its own: removing them while upgrading would make Terraform fail with a cycle. They'll be removed in the next major version.
+
+The certificate is issued once the validation record resolves, which can take a while. HTTPS requests fail until then. If the domain has CAA records, they must allow wildcard certificates from `pki.goog` or `letsencrypt.org`.
 
 ## Cost
 
@@ -255,6 +257,29 @@ The rest depends on usage:
 [Certificate Manager](https://cloud.google.com/certificate-manager/pricing) is free at this scale: the module deploys one certificate, and a project's first 100 are free.
 
 For a single small site with no per-branch environments, a free static hosting service can be cheaper.
+
+## Upgrading from 3.0
+
+The certificate is replaced once, by `<name_prefix>-wildcard-cert` for `<domain>` and `*.<domain>`. It uses the default branch's existing DNS authorization, so there are no DNS changes. If the domain has CAA records, they must allow wildcard certificates (see [DNS](#dns)).
+
+Don't remove branches or turn off `enable_www_redirect` in the same apply as the upgrade: Terraform fails with a cycle before changing anything. Adding branches is fine.
+
+With a single `terraform apply`, Terraform creates the new certificate before deleting the old one, but HTTPS requests fail until Google issues it and the load balancer serves it: about 5 minutes in testing. To avoid that, upgrade in two steps (replace `module.website` with your module's address):
+
+1. Create the new certificate:
+
+   ```sh
+   terraform apply -target=module.website.google_certificate_manager_certificate.default
+   ```
+
+   This ends with the error `can't delete certificate that is referenced by a CertificateMapEntry`, because the old certificate is still in use. That's expected.
+2. Wait until the new certificate is `ACTIVE`:
+
+   ```sh
+   gcloud certificate-manager certificates describe <name_prefix>-wildcard-cert --project <project_id> --format='value(managed.state)'
+   ```
+
+3. Run `terraform apply` to switch to it and delete the old certificate.
 
 ## Upgrading from 2.x
 
