@@ -1,5 +1,6 @@
 # Existing Cloud DNS zone (lab.sepehrjavid.com), two branches, an extra
-# backend under /api, CDN off, HTTP and www redirects on, no CI/CD.
+# backend under /api, CDN off, HTTP and www redirects on, no CI/CD. update.sh
+# then turns the www redirect off.
 
 terraform {
   backend "gcs" {}
@@ -15,6 +16,11 @@ variable "region" {
 
 variable "name_prefix" {
   type = string
+}
+
+variable "enable_www_redirect" {
+  type    = bool
+  default = true
 }
 
 locals {
@@ -55,7 +61,7 @@ module "website" {
   cicd        = { enable = false }
   enable_cdn  = false
 
-  enable_www_redirect = true
+  enable_www_redirect = var.enable_www_redirect
 
   dns_config = {
     set_dns_config = true

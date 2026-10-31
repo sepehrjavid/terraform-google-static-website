@@ -21,6 +21,10 @@ resource "time_sleep" "wait_30_seconds_cert" {
   create_duration = "30s"
 }
 
+# Only the domain's authorization is used: it covers the wildcard. The others
+# are kept because deleting them while the certificate is replaced creates a
+# Terraform cycle when upgrading from 3.0.
+# TODO: remove them in the next major version.
 resource "google_certificate_manager_dns_authorization" "default" {
   for_each   = local.domains
   project    = var.project_id
@@ -29,13 +33,20 @@ resource "google_certificate_manager_dns_authorization" "default" {
   depends_on = [time_sleep.wait_30_seconds_cert]
 }
 
+# The wildcard covers every branch and www, so changing them doesn't replace
+# the certificate. Certificate Manager can't delete a certificate while the map
+# entry uses it, so a replacement must create the new one first.
 resource "google_certificate_manager_certificate" "default" {
   project = var.project_id
-  name    = "${var.name_prefix}-website-cert"
+  name    = "${var.name_prefix}-wildcard-cert"
 
   managed {
-    domains            = [for auth in google_certificate_manager_dns_authorization.default : auth.domain]
-    dns_authorizations = [for auth in google_certificate_manager_dns_authorization.default : auth.id]
+    domains            = [local.domain_name, "*.${local.domain_name}"]
+    dns_authorizations = [google_certificate_manager_dns_authorization.default[var.default_branch_name].id]
+  }
+
+  lifecycle {
+    create_before_destroy = true
   }
 }
 

@@ -101,9 +101,17 @@ run "default_branch_must_be_in_branches" {
 }
 
 run "default_branch_can_be_overridden" {
-  command = plan
+  command = apply
   variables {
     branches            = ["master", "dev"]
     default_branch_name = "master"
+  }
+  override_resource {
+    target = google_certificate_manager_dns_authorization.default
+    values = { dns_resource_record = [{ name = "n", type = "CNAME", data = "d" }] }
+  }
+  assert {
+    condition     = google_certificate_manager_certificate.default.managed[0].dns_authorizations == tolist([google_certificate_manager_dns_authorization.default["master"].id])
+    error_message = "The certificate should use the default branch's DNS authorization."
   }
 }

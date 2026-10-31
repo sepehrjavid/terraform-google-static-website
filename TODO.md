@@ -1,37 +1,55 @@
 # TODO
 
-## Changing the certificate's domains fails on an existing deployment
+## Removing a branch fails on an existing deployment
 
-**Status:** not reproduced yet. Inferred from the provider source and the Certificate Manager docs. The e2e cases only create and destroy, so they never hit it.
+**Status:** seen on a real deployment, also with 3.0.
 
 ### When
 
-Any change to the list of domains on `google_certificate_manager_certificate.default`, on a deployment that already exists:
-
-- adding or removing a branch in `branches`;
-- turning on `enable_www_redirect` (#10).
+Removing a branch from `branches` on a deployment that already exists.
 
 ### Why
 
-1. `managed.domains` and `managed.dns_authorizations` are `ForceNew` in the provider ([source](https://github.com/hashicorp/terraform-provider-google/blob/main/google/services/certificatemanager/resource_certificate_manager_certificate.go)), so the certificate is replaced.
-2. The certificate has a fixed name (`<name_prefix>-website-cert`) and no `create_before_destroy`, so Terraform deletes the old certificate before creating the new one.
-3. Certificate Manager refuses that delete while `google_certificate_manager_certificate_map_entry.default` still references the certificate: "Before you delete a certificate, remove it from all certificate map entries that reference it; otherwise, the deletion fails." ([docs](https://cloud.google.com/certificate-manager/docs/certificates))
-
-So the apply most likely fails at the delete. If it got past that, HTTPS would still be down until the new certificate is issued.
+Terraform deletes the branch's backend bucket before it updates the URL map, which still routes to it, and the API refuses: "The backend_bucket resource '...-dev-backend' is already being used by '...-https-lb', resourceInUseByAnotherResource". That's Terraform's order for a deleted resource without `create_before_destroy`. Targeting the URL map doesn't help, because the target includes the backend buckets it depends on. `terraform destroy` works, since it deletes the URL map first.
 
 ### Proposed fix
 
-Use one certificate for `<domain>` and `*.<domain>`, with a single DNS authorization for the domain. A DNS authorization covers its domain and the wildcard, and every branch domain (and `www`) is one label below the domain. After that, adding branches never changes the certificate, and there's one validation record instead of one per branch.
+To do:
 
-Existing deployments switch certificates once. That needs `create_before_destroy` and a new certificate name, and there's a short window while the new certificate is issued. Document it in the release notes.
+1. Try `create_before_destroy` on `google_compute_backend_bucket.backends`, so the URL map is updated before the backend bucket is deleted. Terraform reads the setting from the state for a deleted instance, so existing backend buckets need an in-place update first for it to apply to them. Check the order with `terraform graph -type=apply -plan=<plan>`.
+2. `create_before_destroy` also applies to the buckets the backend buckets depend on: check what that means when a bucket is replaced.
+3. Change the e2e update step to remove a branch once it works.
 
-Build on #10's `local.domains`, which now drives the DNS authorizations, host rules and DNS records.
+## Changing the domain fails on an existing deployment
+
+**Status:** not reproduced yet. Inferred from the provider source.
+
+### When
+
+Changing the domain (`dns_config.zone_name` or `dns_config.domain_name`) on a deployment that already exists.
+
+### Why
+
+The DNS authorization's `domain` is `ForceNew`, so it's replaced. The certificate's `create_before_destroy` applies to the authorization too, and the new one has the same name (`<name_prefix>-<default_branch>-dns-auth`), so creating it most likely fails with a name conflict. Nothing is deleted, but the apply fails.
+
+### Proposed fix
 
 To do:
 
-1. Reproduce: add a branch to a running e2e deployment.
-2. Confirm in the Certificate Manager docs that a DNS authorization covers its wildcard.
-3. Add an e2e case that changes `branches` on an existing deployment.
+1. Reproduce: change `domain_name` on a running deployment with manual DNS.
+2. If it fails, document it in the README (deploy the new domain with a new `name_prefix`) or give the authorization a name that changes with the domain, which needs a migration for existing deployments.
+
+## Remove the unused DNS authorizations
+
+**Status:** to do in the next major version.
+
+### Why
+
+Since the wildcard certificate, only the default branch's DNS authorization is used. The others, one per branch and one for `www`, are still created, with their validation records, because 3.0 deployments have them. Deleting them in the same apply that replaces the certificate makes Terraform fail with a cycle: the map entry update waits for their deletion, which waits for the old certificate's deletion, which waits for the map entry update.
+
+### Proposed fix
+
+Create only the default branch's authorization and validation record, once deployments are past the certificate switch. No certificate changes in that apply, so no cycle. Check it with `terraform graph -type=apply -plan=<plan>` against a deployment that has more than one branch.
 
 ## The GitHub token can access every repository its owner can
 
