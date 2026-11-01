@@ -6,7 +6,7 @@ Each branch in `branches` gets its own public Cloud Storage bucket, served throu
 
 ## What it creates
 
-- **Per branch**: a bucket `<name_prefix>-<branch>-website-bucket` (public read, `index.html` as main page and [`not_found_page`](#not_found_page) for paths that have no object), a backend bucket (with Cloud CDN when `enable_cdn` is `true`) and a Certificate Manager DNS authorization.
+- **Per branch**: a bucket `<name_prefix>-<branch>-website-bucket` (public read, `index.html` as main page and [`not_found_page`](#not_found_page) for paths that have no object), a backend bucket (with Cloud CDN when `enable_cdn` is `true`) and a Certificate Manager DNS authorization. Only the default branch's authorization is used; the others are kept for compatibility with 3.0 (see [DNS](#dns)).
 - **Load balancer**: a global external Application Load Balancer (`EXTERNAL_MANAGED`) with a static IP, a Google-managed certificate for `<domain>` and `*.<domain>` and, when `enable_http_redirect` is `true`, an HTTP to HTTPS redirect. When `enable_www_redirect` is `true`, `www.<domain>` redirects to the domain. The wildcard covers every branch and `www`, so adding or removing them doesn't change the certificate.
 - **DNS** (when `dns_config.set_dns_config` is `true`): an A record for the domain, a CNAME for each branch subdomain (and for `www` when `enable_www_redirect` is `true`) and the certificate validation records.
 - **CI/CD** (when `cicd.enable` is `true`): a Cloud Build GitHub connection (unless you pass an existing one), the linked repository and a push trigger per branch. Each branch gets a build service account `<name_prefix>-<branch>-build`, unless you pass your own in `build_sa_ids`. Either way, each branch's build service account gets `roles/storage.objectUser` on its bucket, `roles/logging.logWriter` and, when `enable_cdn` is `true`, a custom role that lets it invalidate the CDN cache (see [Build config](#build-config) and [Build service account roles](#build-service-account-roles)).
@@ -214,7 +214,7 @@ lb = {
 | Name | Description |
 |------|-------------|
 | `lb_ip` | Load balancer IP address. |
-| `dns_auth_creds` | Certificate validation records to create yourself, keyed by branch (plus `www` when `enable_www_redirect` is `true`): record name (`cname`), `type` and value (`secret`). `null` when `set_dns_config` is `true`. |
+| `dns_auth_creds` | Validation records of the DNS authorizations, keyed by branch (plus `www` when `enable_www_redirect` is `true`): record name (`cname`), `type` and value (`secret`). Only the default branch's is needed (see [DNS](#dns)). `null` when `set_dns_config` is `true`. |
 | `buckets` | Bucket name per branch. |
 | `github_connection_name` | Name of the Cloud Build GitHub connection in use. `null` when CI/CD is disabled. |
 | `build_sa` | Build service accounts created by the module, keyed by branch. |
@@ -233,9 +233,9 @@ There are two ways to set up the records:
   - an `A` record for the domain, pointing to `lb_ip`;
   - for every other branch, a `CNAME` from `<branch>.<domain>` to the domain;
   - with `enable_www_redirect`, a `CNAME` from `www.<domain>` to the domain;
-  - the certificate validation records from the `dns_auth_creds` output.
+  - the certificate validation record: the default branch's entry in the `dns_auth_creds` output.
 
-The certificate only needs the default branch's validation record, which also covers `*.<domain>`. The other branches' and `www`'s are left over from 3.0, where each domain had its own: removing them while upgrading would make Terraform fail with a cycle. They'll be removed in the next major version.
+The certificate only uses the default branch's DNS authorization, which also covers `*.<domain>`, so it only needs that validation record. The module still creates an authorization for every other branch and for `www`, including ones you add later, and with `set_dns_config` their validation records too. Nothing uses them: they're only kept for compatibility with 3.0, where each domain had its own, because removing them while upgrading from 3.0 would make Terraform fail with a cycle. The next major version will remove them.
 
 The certificate is issued once the validation record resolves, which can take a while. HTTPS requests fail until then. If the domain has CAA records, they must allow wildcard certificates from `pki.goog` or `letsencrypt.org`.
 
