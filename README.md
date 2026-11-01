@@ -260,28 +260,52 @@ For a single small site with no per-branch environments, a free static hosting s
 
 ## Upgrading from 3.0
 
-The certificate is replaced once, by `<name_prefix>-wildcard-cert` for `<domain>` and `*.<domain>`. It uses the default branch's existing DNS authorization, so there are no DNS changes. If the domain has CAA records, they must allow wildcard certificates (see [DNS](#dns)).
+Inputs and outputs are unchanged. The upgrade replaces the certificate once: the new one, `<name_prefix>-wildcard-cert`, covers `<domain>` and `*.<domain>` and uses the default branch's existing DNS authorization, so there are no DNS changes.
 
-Don't remove branches or turn off `enable_www_redirect` in the same apply as the upgrade: Terraform fails with a cycle before changing anything. Adding branches is fine.
+A single `terraform apply` works, but HTTPS requests fail until Google issues the new certificate: about 5 minutes in testing. The steps below avoid that: they create the new certificate first and switch to it once it's issued.
 
-With a single `terraform apply`, Terraform creates the new certificate before deleting the old one, but HTTPS requests fail until Google issues it and the load balancer serves it: about 5 minutes in testing. To avoid that, upgrade in two steps (replace `module.website` with your module's address):
+Before you start:
 
-1. Create the new certificate:
+- Don't change anything else in the configuration until the upgrade is done. Removing a branch or turning off `enable_www_redirect` in the same apply as the upgrade makes Terraform fail with a cycle before it changes anything.
+- If the domain or one of its parent domains has CAA records (check each with `dig +short CAA <name>`), they must allow wildcard certificates from `pki.goog` or `letsencrypt.org`: an `issuewild` record for one of them or, when there's no `issuewild` record, an `issue` record. Otherwise the new certificate is never issued.
+- The commands below use `module.website`. Replace it with your module's address, which `terraform state list | grep -F google_certificate_manager_certificate.default` shows. With several instances of the module, pass a `-target` for each in step 3 and wait for each certificate in step 4.
+
+Then:
+
+1. Get the new version. With `version = "~> 3.0"`, run `terraform init -upgrade`. With an exact version, set it to `"3.1.0"` first.
+2. Run `terraform plan` without applying it. It should only replace the certificate (its name changes from `<name_prefix>-website-cert` to `<name_prefix>-wildcard-cert`) and update the certificate map entry in place: `Plan: 1 to add, 1 to change, 1 to destroy.`
+3. Create the new certificate:
 
    ```sh
-   terraform apply -target=module.website.google_certificate_manager_certificate.default
+   terraform apply -target='module.website.google_certificate_manager_certificate.default'
    ```
 
-   This ends with the error `can't delete certificate that is referenced by a CertificateMapEntry`, because the old certificate is still in use. That's expected.
-2. Wait until the new certificate is `ACTIVE`:
+   The plan says `1 to add, 0 to change, 1 to destroy`. Terraform creates the new certificate, then fails to delete the old one with `can't delete certificate that is referenced by a CertificateMapEntry or other resources`. That's expected: the load balancer still serves the old certificate, and step 5 deletes it.
+4. Wait until the new certificate is `ACTIVE`, about 5 minutes in testing:
 
    ```sh
-   gcloud certificate-manager certificates describe <name_prefix>-wildcard-cert --project <project_id> --format='value(managed.state)'
+   until [ "$(gcloud certificate-manager certificates describe <name_prefix>-wildcard-cert --project <project_id> --format='value(managed.state)')" = ACTIVE ]; do sleep 30; done
    ```
 
-3. Run `terraform apply` to switch to it and delete the old certificate.
+   If it stays `PROVISIONING` or becomes `FAILED`, run the `describe` command with `--format='yaml(managed)'`: `provisioningIssue` and `authorizationAttemptInfo` say why, for example a `failureReason` of `CAA`. The site keeps serving the old certificate in the meantime.
+5. Switch to the new certificate:
+
+   ```sh
+   terraform apply
+   ```
+
+   The plan says `0 to add, 1 to change, 1 to destroy`: the map entry switches to the new certificate and the old one is deleted. For about a minute, some requests still get the old certificate. Both are valid.
+6. Check that `terraform plan` shows no changes and that the site serves the new certificate:
+
+   ```sh
+   openssl s_client -connect <domain>:443 -servername <domain> </dev/null 2>/dev/null | openssl x509 -noout -text | grep -A1 'Subject Alternative Name'
+   ```
+
+   This prints `DNS:<domain>, DNS:*.<domain>`.
 
 ## Upgrading from 2.x
+
+To upgrade to 3.1, upgrade to `3.0.0` and apply first, then follow [Upgrading from 3.0](#upgrading-from-30). 3.0 changes these:
 
 - With CI/CD and `enable_cdn` both `true` (the defaults), the module creates a custom role that lets the builds invalidate the CDN cache. Whoever runs Terraform needs permission to manage custom roles, e.g. `roles/iam.roleAdmin`.
 - Service accounts passed in `build_sa_ids` now get the same roles as the module's own (see [Build service account roles](#build-service-account-roles)), so whoever runs Terraform needs permission to grant them, e.g. `roles/resourcemanager.projectIamAdmin`. If your configuration already grants these roles with `google_project_iam_binding` or `google_storage_bucket_iam_binding`, include the build service accounts there, or drop those bindings with a `removed` block so the module manages the grants.
